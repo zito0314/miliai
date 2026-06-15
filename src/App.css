@@ -145,6 +145,324 @@
   margin-bottom: 14px;
 }
 
+.pbl-generator-section {
+  border-bottom: 1px solid #ccd8d4;
+  background: #f8faf9;
+}
+
+.pbl-generator-inner {
+  width: min(1440px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 28px 0 30px;
+}
+
+.pbl-generator-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.pbl-generator-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  background: #e5efec;
+  color: var(--green);
+  font-size: 18px;
+}
+
+.pbl-generator-heading > div > span,
+.pbl-summary-main > span {
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.pbl-generator-heading h2 {
+  margin: 3px 0 4px;
+  color: var(--navy);
+  font-size: 21px;
+}
+
+.pbl-generator-heading p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.pbl-generator-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.pbl-generator-form .ant-input,
+.pbl-generator-form .ant-btn {
+  min-height: 48px;
+}
+
+.pbl-generator-form .ant-btn {
+  min-width: 142px;
+}
+
+.pbl-generator-help {
+  margin: 8px 0 0;
+  color: #8b6e22;
+  font-size: 12px;
+}
+
+.pbl-generator-error {
+  margin-top: 12px;
+}
+
+.pbl-result {
+  border-top: 1px solid #cfdad6;
+  margin-top: 26px;
+  padding-top: 22px;
+}
+
+.pbl-result-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.pbl-result-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.pbl-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 24px;
+  border-block: 1px solid #d7e0dd;
+  margin-top: 18px;
+  padding: 22px 0;
+}
+
+.pbl-summary-main h2 {
+  margin: 4px 0 18px;
+  color: #17211f;
+  font-size: 24px;
+}
+
+.pbl-summary dl,
+.pbl-task dl {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.pbl-summary dl > div,
+.pbl-task dl > div {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr);
+  gap: 12px;
+}
+
+.pbl-summary dt,
+.pbl-task dt {
+  color: #687772;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.pbl-summary dd,
+.pbl-task dd {
+  margin: 0;
+  color: #35443f;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.pbl-summary-tags {
+  border-left: 1px solid #dce4e1;
+  padding-left: 24px;
+}
+
+.pbl-summary-tags > span {
+  color: #576761;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.pbl-summary-tags > div,
+.concept-list,
+.pbl-task-tags,
+.table-tag-cell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.pbl-summary-tags .ant-tag,
+.concept-list .ant-tag,
+.pbl-task-tags .ant-tag,
+.table-tag-cell .ant-tag {
+  margin: 0;
+  border-color: #cfddd8;
+  border-radius: 999px;
+  background: #edf4f2;
+  color: #3f5f56;
+}
+
+.pbl-draft-alert {
+  margin: 18px 0;
+}
+
+.pbl-hierarchy {
+  display: grid;
+  gap: 18px;
+}
+
+.pbl-unit {
+  border: 1px solid #cfdad6;
+  border-radius: 8px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.pbl-unit-heading {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 14px;
+  padding: 20px 22px;
+  background: #eaf2ef;
+}
+
+.pbl-unit-heading > span,
+.pbl-mission-heading > span,
+.pbl-task-title > span {
+  color: var(--green);
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.pbl-unit-heading h3 {
+  margin: 0;
+  color: #17211f;
+  font-size: 19px;
+}
+
+.pbl-unit-heading p,
+.pbl-mission-heading p {
+  margin: 7px 0 0;
+  color: #495954;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.pbl-unit-heading p strong,
+.pbl-mission-heading p strong {
+  margin-right: 5px;
+  color: #687772;
+  font-size: 11px;
+}
+
+.pbl-mission-list {
+  display: grid;
+  gap: 20px;
+  padding: 22px;
+}
+
+.pbl-mission {
+  border-left: 3px solid #7693a8;
+  padding-left: 18px;
+}
+
+.pbl-mission-heading {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.pbl-mission-heading > span {
+  color: #44667e;
+}
+
+.pbl-mission-heading h4 {
+  margin: 0;
+  color: #263a48;
+  font-size: 16px;
+}
+
+.pbl-task-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 16px 0 0 52px;
+}
+
+.pbl-task {
+  min-width: 0;
+  border: 1px solid #e0e6e4;
+  border-radius: 7px;
+  padding: 16px;
+  background: #fbfcfc;
+}
+
+.pbl-task-title {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+}
+
+.pbl-task-title > span {
+  color: #8a6b21;
+}
+
+.pbl-task h5 {
+  margin: 0;
+  color: #26332f;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.pbl-task > p {
+  margin: 10px 0 14px;
+  color: #53625d;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.pbl-task dl > div {
+  grid-template-columns: 58px minmax(0, 1fr);
+}
+
+.pbl-task ul {
+  margin: 0;
+  padding-left: 17px;
+}
+
+.pbl-plan-table .ant-table {
+  border: 1px solid #dce4e1;
+  border-radius: 8px;
+}
+
+.table-task-cell {
+  display: grid;
+  gap: 5px;
+}
+
+.table-task-cell strong {
+  color: #26332f;
+  font-size: 12px;
+}
+
+.table-task-cell span,
+.table-task-cell small {
+  color: #5e6d68;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
 .search-inner {
   padding: 30px 0 26px;
 }
@@ -717,6 +1035,20 @@ mark {
   .simple-description {
     min-height: auto;
   }
+
+  .pbl-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .pbl-summary-tags {
+    border-left: 0;
+    border-top: 1px solid #dce4e1;
+    padding: 18px 0 0;
+  }
+
+  .pbl-task-list {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 780px) {
@@ -726,6 +1058,49 @@ mark {
   .data-error-alert,
   .workspace {
     width: min(100% - 28px, 1440px);
+  }
+
+  .pbl-generator-inner {
+    width: min(100% - 28px, 1440px);
+  }
+
+  .pbl-generator-form {
+    grid-template-columns: 1fr;
+  }
+
+  .pbl-generator-form .ant-btn {
+    width: 100%;
+  }
+
+  .pbl-result-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .pbl-result-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .pbl-unit-heading {
+    grid-template-columns: 38px minmax(0, 1fr);
+    padding: 17px;
+  }
+
+  .pbl-mission-list {
+    padding: 17px;
+  }
+
+  .pbl-mission {
+    padding-left: 12px;
+  }
+
+  .pbl-mission-heading {
+    grid-template-columns: 36px minmax(0, 1fr);
+  }
+
+  .pbl-task-list {
+    margin-left: 0;
   }
 
   .header-inner {
