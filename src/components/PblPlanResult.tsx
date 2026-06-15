@@ -2,11 +2,11 @@ import { useState } from 'react'
 import { CopyOutlined, DownloadOutlined, UnorderedListOutlined } from '@ant-design/icons'
 import { Alert, Button, Segmented, Tag, message } from 'antd'
 import type { PblPlan } from '../types/pbl'
-import { copyPblPlanAsTsv } from '../utils/copyPblPlanAsTsv'
+import { copyExcelRowsAsTsv } from '../utils/copyPblPlanAsTsv'
 import { downloadJson } from '../utils/downloadJson'
 import { PblPlanTable } from './PblPlanTable'
 
-type ViewMode = '계층 보기' | '표 보기'
+type ViewMode = '계층 보기' | '엑셀 표 보기'
 
 export function PblPlanResult({ plan }: { plan: PblPlan }) {
   const [viewMode, setViewMode] = useState<ViewMode>('계층 보기')
@@ -14,8 +14,8 @@ export function PblPlanResult({ plan }: { plan: PblPlan }) {
 
   const handleCopy = async () => {
     try {
-      await copyPblPlanAsTsv(plan)
-      messageApi.success('표 형태로 복사했어요. Google Sheets에 붙여넣을 수 있습니다.')
+      await copyExcelRowsAsTsv(plan.excelRows)
+      messageApi.success('엑셀 형태로 복사했어요. Google Sheets에 바로 붙여넣을 수 있습니다.')
     } catch {
       messageApi.error('클립보드에 복사하지 못했어요.')
     }
@@ -29,13 +29,13 @@ export function PblPlanResult({ plan }: { plan: PblPlan }) {
           value={viewMode}
           options={[
             { label: '계층 보기', value: '계층 보기', icon: <UnorderedListOutlined /> },
-            { label: '표 보기', value: '표 보기' },
+            { label: '엑셀 표 보기', value: '엑셀 표 보기' },
           ]}
           onChange={setViewMode}
         />
         <div className="pbl-result-actions">
           <Button icon={<CopyOutlined />} onClick={() => void handleCopy()}>
-            표 형태로 복사
+            엑셀 형태로 복사
           </Button>
           <Button icon={<DownloadOutlined />} onClick={() => downloadJson(plan)}>
             JSON 다운로드
@@ -48,6 +48,10 @@ export function PblPlanResult({ plan }: { plan: PblPlan }) {
           <span>과정</span>
           <h2>{plan.courseName}</h2>
           <dl>
+            <div>
+              <dt>프로젝트</dt>
+              <dd>{plan.projectOverview.projectTitle}</dd>
+            </div>
             <div>
               <dt>커리큘럼</dt>
               <dd>{plan.curriculumName}</dd>
@@ -68,9 +72,22 @@ export function PblPlanResult({ plan }: { plan: PblPlan }) {
               <dt>최종 산출물</dt>
               <dd>{plan.subject.finalOutput}</dd>
             </div>
+            <div>
+              <dt>프로젝트 목표</dt>
+              <dd>{plan.projectOverview.projectGoal}</dd>
+            </div>
+            <div>
+              <dt>제약 조건</dt>
+              <dd>{plan.projectOverview.constraints}</dd>
+            </div>
           </dl>
         </div>
         <div className="pbl-summary-tags">
+          <div className="pbl-project-facts">
+            <span>기간 <strong>{plan.projectOverview.totalDuration}</strong></span>
+            <span>팀 구성 <strong>{plan.projectOverview.teamComposition}</strong></span>
+            <span>난이도 <strong>{plan.projectOverview.difficultyLevel}</strong></span>
+          </div>
           <span>추천 기술 태그</span>
           <div>
             {plan.subject.recommendedTags.map((tag) => <Tag key={tag}>{tag}</Tag>)}
@@ -85,7 +102,7 @@ export function PblPlanResult({ plan }: { plan: PblPlan }) {
         title="AI가 생성한 과정설계 초안입니다. 교육 목표와 실제 데이터 환경에 맞게 검토·수정해주세요."
       />
 
-      {viewMode === '표 보기' ? <PblPlanTable plan={plan} /> : <PblHierarchy plan={plan} />}
+      {viewMode === '엑셀 표 보기' ? <PblPlanTable rows={plan.excelRows} /> : <PblHierarchy plan={plan} />}
     </section>
   )
 }
@@ -125,6 +142,10 @@ function PblHierarchy({ plan }: { plan: PblPlan }) {
                         <h5>{task.title}</h5>
                       </div>
                       <p>{task.description}</p>
+                      <div className="pbl-task-meta">
+                        <Tag>{task.estimatedTime}</Tag>
+                        <Tag>{task.difficultyLevel}</Tag>
+                      </div>
                       <dl>
                         <div>
                           <dt>산출물</dt>

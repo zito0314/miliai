@@ -4,6 +4,8 @@ export type RequiredTechnology = {
   reason: string
 }
 
+export type DifficultyLevel = '초급' | '중급' | '고급'
+
 export type PblTask = {
   id: string
   title: string
@@ -12,6 +14,8 @@ export type PblTask = {
   assessmentCriteria: string[]
   requiredTechnologies: RequiredTechnology[]
   requiredTags: string[]
+  estimatedTime: string
+  difficultyLevel: DifficultyLevel
 }
 
 export type PblMission = {
@@ -32,6 +36,17 @@ export type PblUnit = {
 export type PblPlan = {
   courseName: string
   curriculumName: string
+  projectOverview: {
+    projectTitle: string
+    totalDuration: string
+    teamComposition: string
+    difficultyLevel: DifficultyLevel
+    projectGoal: string
+    finalOutput: string
+    constraints: string
+    evaluationCriteria: string
+    missionList: string
+  }
   subject: {
     id: string
     title: string
@@ -41,23 +56,61 @@ export type PblPlan = {
     recommendedTags: string[]
   }
   units: PblUnit[]
+  excelRows: PblExcelRow[]
+  missionSheets: MissionSheet[]
 }
 
-export type PblPlanRow = {
-  key: string
+export type PblExcelRow = {
   courseName: string
   curriculumName: string
   subjectTitle: string
+  subjectSummary: string
   unitId: string
   unitTitle: string
+  unitGoal: string
   missionId: string
   missionTitle: string
+  missionGoal: string
   taskId: string
   taskTitle: string
-  description: string
+  taskDescription: string
   output: string
-  assessmentCriteria: string
-  requiredTechnologies: string
-  requiredTechnologyDetails: string
-  requiredTags: string
+  requiredTechnologiesText: string
+  requiredTagsText: string
+  assessmentCriteriaText: string
+  firstEvaluation: string
+  secondEvaluation: string
+  thirdEvaluation: string
+  finalResult: string
+  estimatedTime: string
+  difficultyLevel: DifficultyLevel
+}
+
+export type MissionSheet = {
+  unitId: string
+  unitTitle: string
+  overview: string
+  learningGoals: string[]
+  prerequisiteLessons: string[]
+  techStack: string[]
+  pblProblem: string
+  missionStatement: string
+  fiveStepGuide: Array<{
+    step: string
+    title: string
+    actions: string[]
+    output: string
+  }>
+  submissions: string[]
+  evaluationRubric: Array<{
+    area: string
+    question: string
+    passCriteria: string[]
+    resultOptions: Array<'PASS' | 'FAIL'>
+  }>
+  aiUsageGuide: {
+    allowedUses: Array<{ title: string; examplePrompt: string }>
+    prohibitedUses: Array<{ title: string; examplePrompt: string }>
+    principles: string[]
+  }
 }

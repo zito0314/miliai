@@ -87,7 +87,8 @@ id | category | name | description | simpleDescription | useCases | pblUsage | t
 - 기술 카드, Unit 예시, 상세 정보 패널
 - 과목명과 검색 데이터 맥락을 활용한 PBL 과정·Unit·Mission·Task 초안 생성
 - 각 Task에 필요한 기술명·카테고리·필요 이유 연결
-- 생성 결과의 계층/표 보기 전환, TSV 복사, JSON 다운로드
+- 프로젝트 개요와 Unit별 미션지 데이터 생성
+- `excelRows` 기반 PBL 템플릿 표, Google Sheets용 TSV 복사, JSON 다운로드
 - 마지막 업데이트 시간 및 로딩·오류·빈 상태
 - 브라우저에 저장되는 즐겨찾기
 - 데스크톱과 모바일 반응형 레이아웃
@@ -119,7 +120,6 @@ src/
   utils/
     copyPblPlanAsTsv.ts
     downloadJson.ts
-    flattenPblPlan.ts
     normalizeText.ts
     parseTags.ts
     search.tsx

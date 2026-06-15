@@ -1,63 +1,74 @@
 import { Table, Tag } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import type { PblPlan, PblPlanRow } from '../types/pbl'
-import { flattenPblPlan } from '../utils/flattenPblPlan'
+import type { PblExcelRow } from '../types/pbl'
 
-const columns: ColumnsType<PblPlanRow> = [
-  { title: '과정', dataIndex: 'courseName', width: 180 },
-  { title: '커리큘럼', dataIndex: 'curriculumName', width: 180 },
-  { title: '과목(Subject)', dataIndex: 'subjectTitle', width: 190 },
-  {
-    title: '단원(Unit)',
-    width: 220,
-    render: (_, row) => `${row.unitId}. ${row.unitTitle}`,
-  },
-  {
-    title: '미션(Mission)',
-    width: 220,
-    render: (_, row) => `${row.missionId}. ${row.missionTitle}`,
-  },
-  {
-    title: '문제(Problem/Task)',
-    width: 300,
-    render: (_, row) => (
-      <div className="table-task-cell">
-        <strong>{row.taskId}. {row.taskTitle}</strong>
-        <span>{row.description}</span>
-        <small>산출물: {row.output}</small>
-      </div>
-    ),
-  },
+const textColumn = (title: string, dataIndex: keyof PblExcelRow, width: number) => ({
+  title,
+  dataIndex,
+  width,
+  render: (value: string) => <span className="excel-table-text">{value}</span>,
+})
+
+const columns: ColumnsType<PblExcelRow> = [
+  textColumn('과정', 'courseName', 180),
+  textColumn('커리큘럼', 'curriculumName', 190),
+  textColumn('과목', 'subjectTitle', 190),
+  textColumn('과목 요약', 'subjectSummary', 280),
+  textColumn('Unit ID', 'unitId', 90),
+  textColumn('단원', 'unitTitle', 210),
+  textColumn('단원 목표', 'unitGoal', 260),
+  textColumn('Mission ID', 'missionId', 100),
+  textColumn('미션', 'missionTitle', 210),
+  textColumn('미션 목표', 'missionGoal', 260),
+  textColumn('Task ID', 'taskId', 90),
+  textColumn('문제/Task', 'taskTitle', 220),
+  textColumn('문제 설명', 'taskDescription', 300),
+  textColumn('산출물', 'output', 220),
   {
     title: '필요 기술',
-    dataIndex: 'requiredTechnologies',
+    dataIndex: 'requiredTechnologiesText',
     width: 240,
-    render: (technologies: string) => (
+    render: (value: string) => (
       <div className="table-technology-cell">
-        {technologies.split(', ').filter(Boolean).map((technology) => <Tag key={technology}>{technology}</Tag>)}
+        {value.split(',').map((technology) => technology.trim()).filter(Boolean).map((technology) => (
+          <Tag key={technology}>{technology}</Tag>
+        ))}
       </div>
     ),
   },
   {
     title: '태그',
-    dataIndex: 'requiredTags',
-    width: 220,
-    render: (tags: string) => (
+    dataIndex: 'requiredTagsText',
+    width: 240,
+    render: (value: string) => (
       <div className="table-tag-cell">
-        {tags.split(' ').filter(Boolean).map((tag) => <Tag key={tag}>{tag}</Tag>)}
+        {value.split(' ').filter(Boolean).map((tag) => <Tag key={tag}>{tag}</Tag>)}
       </div>
     ),
   },
+  textColumn('평가 기준', 'assessmentCriteriaText', 300),
+  textColumn('1차 평가', 'firstEvaluation', 130),
+  textColumn('2차 평가', 'secondEvaluation', 150),
+  textColumn('3차 평가', 'thirdEvaluation', 150),
+  textColumn('최종 결과', 'finalResult', 120),
+  textColumn('예상 시간', 'estimatedTime', 110),
+  {
+    title: '난이도',
+    dataIndex: 'difficultyLevel',
+    width: 100,
+    render: (value: string) => <Tag color={value === '고급' ? 'red' : value === '중급' ? 'gold' : 'green'}>{value}</Tag>,
+  },
 ]
 
-export function PblPlanTable({ plan }: { plan: PblPlan }) {
+export function PblPlanTable({ rows }: { rows: PblExcelRow[] }) {
   return (
-    <Table<PblPlanRow>
+    <Table<PblExcelRow>
       className="pbl-plan-table"
       columns={columns}
-      dataSource={flattenPblPlan(plan)}
+      dataSource={rows}
+      rowKey={(row) => `${row.unitId}-${row.missionId}-${row.taskId}`}
       pagination={false}
-      scroll={{ x: 1750 }}
+      scroll={{ x: 4380 }}
       size="small"
     />
   )

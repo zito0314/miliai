@@ -292,6 +292,27 @@
   font-weight: 800;
 }
 
+.pbl-project-facts {
+  display: grid !important;
+  gap: 8px !important;
+  border-bottom: 1px solid #dce4e1;
+  margin: 0 0 18px !important;
+  padding-bottom: 18px;
+}
+
+.pbl-project-facts span {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: #687772;
+  font-size: 12px;
+}
+
+.pbl-project-facts strong {
+  color: #273b35;
+  text-align: right;
+}
+
 .pbl-summary-tags > div,
 .concept-list,
 .pbl-task-tags,
@@ -434,6 +455,20 @@
   line-height: 1.6;
 }
 
+.pbl-task-meta {
+  display: flex;
+  gap: 6px;
+  margin: -4px 0 14px;
+}
+
+.pbl-task-meta .ant-tag {
+  margin: 0;
+  border-color: #d8dfdc;
+  background: #ffffff;
+  color: #5d6b66;
+  font-size: 10px;
+}
+
 .pbl-task dl > div {
   grid-template-columns: 58px minmax(0, 1fr);
 }
@@ -513,6 +548,25 @@
   color: #5e6d68;
   font-size: 11px;
   line-height: 1.45;
+}
+
+.excel-table-text {
+  display: block;
+  color: #4d5c57;
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: normal;
+}
+
+.pbl-plan-table .ant-table-thead > tr > th {
+  background: #e8f0ed;
+  color: #30483f;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.pbl-plan-table .ant-table-tbody > tr > td {
+  vertical-align: top;
 }
 
 .search-inner {
