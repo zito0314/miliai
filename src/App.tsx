@@ -6,6 +6,7 @@ import { CategoryFilter } from './components/CategoryFilter'
 import { DataStatusBar } from './components/DataStatusBar'
 import { EmptyState } from './components/EmptyState'
 import { Header } from './components/Header'
+import { PblGenerator } from './components/PblGenerator'
 import { SearchBar } from './components/SearchBar'
 import { TagFilter } from './components/TagFilter'
 import { TechCard } from './components/TechCard'
@@ -135,6 +136,7 @@ function App() {
         itemCount={techItems.length}
         onRefresh={() => void loadTechItems()}
       />
+      <PblGenerator techItems={techItems} isTechItemsLoading={loading} />
 
       <main className="workspace">
         <aside className="filter-sidebar" aria-label="검색 필터">
