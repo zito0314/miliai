@@ -61,6 +61,10 @@ export function PblPlanResult({ plan }: { plan: PblPlan }) {
               <dd>{plan.subject.summary}</dd>
             </div>
             <div>
+              <dt>문제 상황</dt>
+              <dd>{plan.subject.problemContext}</dd>
+            </div>
+            <div>
               <dt>최종 산출물</dt>
               <dd>{plan.subject.finalOutput}</dd>
             </div>
@@ -133,6 +137,20 @@ function PblHierarchy({ plan }: { plan: PblPlan }) {
                           </dd>
                         </div>
                       </dl>
+                      <div className="pbl-task-technologies">
+                        <strong>필요 기술</strong>
+                        <div className="pbl-technology-list">
+                          {task.requiredTechnologies.map((technology) => (
+                            <div className="pbl-technology" key={`${task.id}-${technology.name}`}>
+                              <div>
+                                <strong>{technology.name}</strong>
+                                <Tag>{technology.category}</Tag>
+                              </div>
+                              <p>{technology.reason}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                       <div className="pbl-task-tags">
                         {task.requiredTags.map((tag) => <Tag key={tag}>{tag}</Tag>)}
                       </div>

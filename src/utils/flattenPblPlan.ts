@@ -17,6 +17,10 @@ export function flattenPblPlan(plan: PblPlan): PblPlanRow[] {
         description: task.description,
         output: task.output,
         assessmentCriteria: task.assessmentCriteria.join(' / '),
+        requiredTechnologies: task.requiredTechnologies.map((technology) => technology.name).join(', '),
+        requiredTechnologyDetails: task.requiredTechnologies
+          .map((technology) => `${technology.name} (${technology.category}): ${technology.reason}`)
+          .join(' / '),
         requiredTags: task.requiredTags.join(' '),
       })),
     ),

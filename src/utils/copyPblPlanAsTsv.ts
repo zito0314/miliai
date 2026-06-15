@@ -14,6 +14,8 @@ const columns = [
   'description',
   'output',
   'assessmentCriteria',
+  'requiredTechnologies',
+  'requiredTechnologyDetails',
   'requiredTags',
 ] as const
 

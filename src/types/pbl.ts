@@ -1,9 +1,16 @@
+export type RequiredTechnology = {
+  name: string
+  category: string
+  reason: string
+}
+
 export type PblTask = {
   id: string
   title: string
   description: string
   output: string
   assessmentCriteria: string[]
+  requiredTechnologies: RequiredTechnology[]
   requiredTags: string[]
 }
 
@@ -29,6 +36,7 @@ export type PblPlan = {
     id: string
     title: string
     summary: string
+    problemContext: string
     finalOutput: string
     recommendedTags: string[]
   }
@@ -49,5 +57,7 @@ export type PblPlanRow = {
   description: string
   output: string
   assessmentCriteria: string
+  requiredTechnologies: string
+  requiredTechnologyDetails: string
   requiredTags: string
 }

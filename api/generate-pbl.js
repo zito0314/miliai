@@ -1,12 +1,19 @@
 import { GoogleGenAI } from '@google/genai'
 import { z } from 'zod'
 
+const requiredTechnologySchema = z.object({
+  name: z.string(),
+  category: z.string(),
+  reason: z.string(),
+})
+
 const taskSchema = z.object({
   id: z.string(),
   title: z.string(),
   description: z.string(),
   output: z.string(),
   assessmentCriteria: z.array(z.string()).min(1),
+  requiredTechnologies: z.array(requiredTechnologySchema).min(2).max(5),
   requiredTags: z.array(z.string()).min(3),
 })
 
@@ -32,6 +39,7 @@ const pblPlanSchema = z.object({
     id: z.string(),
     title: z.string(),
     summary: z.string(),
+    problemContext: z.string(),
     finalOutput: z.string(),
     recommendedTags: z.array(z.string()).min(3),
   }),
@@ -69,7 +77,7 @@ export default async function handler(request, response) {
       contents: buildPrompt(subjectName.slice(0, 200), techContext),
       config: {
         temperature: 0.45,
-        maxOutputTokens: 12000,
+        maxOutputTokens: 16000,
         responseMimeType: 'application/json',
         responseJsonSchema,
       },
@@ -133,6 +141,7 @@ ${techContext || '별도 기술 컨텍스트 없음'}
 
 [생성 목표]
 입력 과목명을 바탕으로 Course → Curriculum → Subject → Unit → Mission → Problem/Task 구조의 PBL 콘텐츠 초안을 생성한다.
+특히 각 Problem/Task에 해당 문제를 수행하기 위해 필요한 기술명, 기술 카테고리, 필요한 이유를 반드시 연결한다.
 
 [콘텐츠 설계 프로세스]
 아래 순서로 내부적으로 검토하고 설계하되, 사고 과정은 출력하지 않는다.
@@ -140,26 +149,34 @@ ${techContext || '별도 기술 컨텍스트 없음'}
 1. 과목명이 다루는 실제 군 업무 또는 부대 생활의 문제 상황을 해석한다.
 2. 학습자가 교육 종료 시 제출할 최종 산출물을 먼저 정의한다.
 3. 최종 산출물을 만들기 위해 필요한 데이터·AI 활용 흐름을 추론한다.
-4. 기술 흐름을 2~4개의 Unit으로 나눈다.
-5. 각 Unit을 1~3개의 Mission으로 나눈다.
-6. 각 Mission을 2~4개의 Problem/Task로 나눈다.
-7. 각 Task에 참고 기술 사전과 연결되는 기술 태그를 3개 이상 지정한다.
-8. 각 Task에 확인 가능한 산출물과 구체적인 평가 기준을 작성한다.
-9. 아래 품질 검증 기준으로 전체 구조를 점검하고 문제가 있으면 내부적으로 수정한다.
+4. 참고 기술 사전에서 과목과 관련 있는 기술을 선별한다.
+5. 기술 흐름을 2~4개의 Unit으로 나눈다.
+6. 각 Unit을 1~3개의 Mission으로 나눈다.
+7. 각 Mission을 2~4개의 Problem/Task로 나눈다.
+8. 각 Task에 참고 기술 사전과 연결되는 requiredTechnologies를 2~5개 지정한다.
+9. 각 Task에 참고 기술 사전과 연결되는 기술 태그를 3개 이상 지정한다.
+10. 각 Task에 확인 가능한 산출물과 구체적인 평가 기준을 작성한다.
+11. 아래 품질 검증 기준으로 전체 구조를 점검하고 문제가 있으면 내부적으로 수정한다.
 
 [작성 규칙]
 - courseName은 과목을 포괄하는 상위 교육 과정명으로 작성한다.
 - curriculumName은 해당 과목이 속할 만한 군 장병 AI·데이터 역량 커리큘럼명으로 작성한다.
 - subject.title은 입력 과목명의 의미를 유지하고, subject.summary에는 문제 상황과 학습 방향을 자연스러운 한국어로 설명한다.
+- subject.problemContext에는 이 과목이 해결하려는 군 실무 문제 상황을 한 문단으로 구체적으로 작성한다.
 - subject.finalOutput은 보고서, 표, 그래프, 간단한 코드, 분석 결과, 체크리스트, 프로토타입 등 제출 가능한 구체적 결과물로 작성한다.
 - Unit은 기술명이 아니라 문제 해결의 학습 단계 중심으로 작성한다.
 - Mission은 학습자가 완료해야 할 작은 과업 중심으로 작성한다.
+- 각 Mission은 초급~중급 학습자가 약 10~30분 안에 수행할 수 있는 범위로 설계한다.
 - Problem/Task는 실제 온라인 실습과 평가가 가능한 하나의 구체 행동으로 작성한다.
 - 하나의 Task에 여러 행동을 나열하지 않는다. 필요한 경우 Task를 분리한다.
 - Task 제목에는 가능하면 불러오기, 확인하기, 정리하기, 계산하기, 비교하기, 시각화하기, 해석하기, 작성하기, 제출하기 같은 수행 동사를 사용한다.
 - Task description에는 학습자가 무엇을 어떤 자료나 도구로 수행하는지 명확히 작성한다.
 - Task output에는 제출하거나 화면에서 확인할 수 있는 결과물 하나를 구체적으로 작성한다.
 - assessmentCriteria는 산출물에서 실제로 확인할 수 있는 기준을 작성한다. 모호한 태도나 이해 여부만 평가하지 않는다.
+- requiredTechnologies는 Task마다 2~5개 작성한다. 각 항목에는 name, category, reason을 빠짐없이 포함한다.
+- requiredTechnologies.name은 참고 기술 사전의 기술명 표기를 그대로 사용하는 것을 우선한다. 사전에 없는 기술은 꼭 필요한 경우에만 최소한으로 추가한다.
+- requiredTechnologies.category는 참고 기술 사전의 카테고리를 우선 사용한다.
+- requiredTechnologies.reason은 해당 Task의 구체 행동과 직접 연결되는 쉬운 한국어 한 문장으로 작성한다.
 - requiredTags와 recommendedTags는 참고 기술 사전의 태그를 우선 사용하고 모두 #으로 시작한다.
 - requiredConcepts는 Unit 수행에 필요한 기술이나 개념을 쉬운 표현으로 작성한다.
 - 난이도는 디지털 도구 사용 경험이 많지 않은 초급~중급 장병도 안내에 따라 수행할 수 있는 수준으로 유지한다.
@@ -187,6 +204,8 @@ ${techContext || '별도 기술 컨텍스트 없음'}
 - Unit → Mission → Task의 크기와 포함 관계가 적절한가
 - 각 Task가 하나의 실제 수행 가능한 행동인가
 - 각 Task에 확인 가능한 산출물과 평가 기준이 있는가
+- 각 Task의 requiredTechnologies가 2~5개이며 기술명, 카테고리, 필요한 이유를 모두 포함하는가
+- requiredTechnologies가 참고 기술 사전의 기술명과 최대한 연결되는가
 - 각 Task의 기술 태그가 3개 이상이며 참고 기술 사전과 연결되는가
 - 초급~중급 군 장병 대상 AI 활용 교육 난이도에 맞는가
 - 앞 단계의 결과물을 다음 단계에서 활용하는 흐름이 자연스러운가

@@ -295,6 +295,7 @@
 .pbl-summary-tags > div,
 .concept-list,
 .pbl-task-tags,
+.table-technology-cell,
 .table-tag-cell {
   display: flex;
   flex-wrap: wrap;
@@ -305,6 +306,7 @@
 .pbl-summary-tags .ant-tag,
 .concept-list .ant-tag,
 .pbl-task-tags .ant-tag,
+.table-technology-cell .ant-tag,
 .table-tag-cell .ant-tag {
   margin: 0;
   border-color: #cfddd8;
@@ -439,6 +441,56 @@
 .pbl-task ul {
   margin: 0;
   padding-left: 17px;
+}
+
+.pbl-task-technologies {
+  border-top: 1px solid #e1e8e5;
+  margin-top: 15px;
+  padding-top: 14px;
+}
+
+.pbl-task-technologies > strong {
+  color: #52625d;
+  font-size: 12px;
+}
+
+.pbl-technology-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 9px;
+}
+
+.pbl-technology {
+  border-left: 3px solid #72a08f;
+  padding: 8px 10px;
+  background: #f0f6f4;
+}
+
+.pbl-technology > div {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.pbl-technology > div > strong {
+  color: #244d40;
+  font-size: 12px;
+}
+
+.pbl-technology .ant-tag {
+  margin: 0;
+  border-color: #c8dad4;
+  background: #ffffff;
+  color: #536a62;
+  font-size: 10px;
+}
+
+.pbl-technology p {
+  margin: 5px 0 0;
+  color: #53625d;
+  font-size: 11px;
+  line-height: 1.5;
 }
 
 .pbl-plan-table .ant-table {

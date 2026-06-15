@@ -29,6 +29,16 @@ const columns: ColumnsType<PblPlanRow> = [
     ),
   },
   {
+    title: '필요 기술',
+    dataIndex: 'requiredTechnologies',
+    width: 240,
+    render: (technologies: string) => (
+      <div className="table-technology-cell">
+        {technologies.split(', ').filter(Boolean).map((technology) => <Tag key={technology}>{technology}</Tag>)}
+      </div>
+    ),
+  },
+  {
     title: '태그',
     dataIndex: 'requiredTags',
     width: 220,
@@ -47,7 +57,7 @@ export function PblPlanTable({ plan }: { plan: PblPlan }) {
       columns={columns}
       dataSource={flattenPblPlan(plan)}
       pagination={false}
-      scroll={{ x: 1510 }}
+      scroll={{ x: 1750 }}
       size="small"
     />
   )
