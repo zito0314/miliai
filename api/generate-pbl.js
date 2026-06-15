@@ -25,7 +25,7 @@ const missionSchema = z.object({
   id: z.string(),
   title: z.string(),
   goal: z.string(),
-  tasks: z.array(taskSchema).min(2).max(4),
+  tasks: z.array(taskSchema).min(1).max(4),
 })
 
 const unitSchema = z.object({
@@ -122,9 +122,9 @@ const pblPlanSchema = z.object({
     finalOutput: z.string(),
     recommendedTags: z.array(z.string()).min(3),
   }),
-  units: z.array(unitSchema).min(2).max(4),
+  units: z.array(unitSchema).min(1).max(4),
   excelRows: z.array(excelRowSchema).min(1),
-  missionSheets: z.array(missionSheetSchema).min(2).max(4),
+  missionSheets: z.array(missionSheetSchema).min(1).max(4),
 })
 
 const responseJsonSchema = z.toJSONSchema(pblPlanSchema, { target: 'draft-7' })
@@ -168,8 +168,15 @@ export default async function handler(request, response) {
       throw new Error('Gemini가 빈 응답을 반환했습니다.')
     }
 
-    const parsed = pblPlanSchema.safeParse(JSON.parse(result.text))
+    const generatedPlan = safeJsonParse(result.text)
+    if (!generatedPlan) {
+      throw new Error('Gemini 응답을 JSON으로 파싱하지 못했습니다.')
+    }
+
+    const normalizedPlan = normalizeGeneratedPlan(generatedPlan, subjectName)
+    const parsed = pblPlanSchema.safeParse(normalizedPlan)
     if (!parsed.success) {
+      console.error('PBL schema validation issues', parsed.error.issues.slice(0, 12))
       throw new Error('Gemini 응답이 과정설계 JSON 구조와 맞지 않습니다.')
     }
 
@@ -213,6 +220,305 @@ function validatePlanConsistency(plan) {
   if (hasInvalidResultOptions) {
     throw new Error('missionSheets 평가 결과에는 PASS와 FAIL이 모두 필요합니다.')
   }
+}
+
+function normalizeGeneratedPlan(generatedPlan, fallbackSubjectName) {
+  const rawPlan = asObject(generatedPlan)
+  const rawSubject = asObject(rawPlan.subject)
+  const courseName = asString(rawPlan.courseName, `${fallbackSubjectName} AI 활용 과정`)
+  const curriculumName = asString(rawPlan.curriculumName, '군 장병 AI·데이터 문제해결 커리큘럼')
+
+  const subject = {
+    id: asString(rawSubject.id, 'S1'),
+    title: asString(rawSubject.title, fallbackSubjectName),
+    summary: asString(rawSubject.summary, `${fallbackSubjectName}을 군 실무 문제 해결 관점에서 수행하는 PBL 과목입니다.`),
+    problemContext: asString(rawSubject.problemContext, `${fallbackSubjectName}과 관련된 군 실무 문제를 비식별·가상 데이터로 해결합니다.`),
+    finalOutput: asString(rawSubject.finalOutput, `${fallbackSubjectName} 수행 결과 보고서와 산출물`),
+    recommendedTags: normalizeTags(asArray(rawSubject.recommendedTags), ['#AI활용', '#PBL', '#문제해결']),
+  }
+
+  const units = asArray(rawPlan.units)
+    .slice(0, 4)
+    .map((unit, unitIndex) => normalizeUnit(unit, unitIndex))
+    .filter((unit) => unit.missions.length > 0)
+
+  if (units.length === 0) {
+    throw new Error('Gemini 응답에 사용할 수 있는 Unit/Mission/Task가 없습니다.')
+  }
+
+  const normalizedPlan = {
+    courseName,
+    curriculumName,
+    projectOverview: normalizeProjectOverview(rawPlan.projectOverview, { courseName, curriculumName, subject, units }),
+    subject,
+    units,
+    excelRows: [],
+    missionSheets: [],
+  }
+
+  normalizedPlan.excelRows = buildExcelRows(normalizedPlan)
+  normalizedPlan.missionSheets = buildMissionSheets(rawPlan.missionSheets, normalizedPlan)
+  return normalizedPlan
+}
+
+function normalizeUnit(value, index) {
+  const rawUnit = asObject(value)
+  const id = asString(rawUnit.id, `U${index + 1}`)
+  const title = stripLeadingId(asString(rawUnit.title, `단원 ${index + 1}`))
+  const missions = asArray(rawUnit.missions)
+    .slice(0, 3)
+    .map((mission, missionIndex) => normalizeMission(mission, missionIndex))
+    .filter((mission) => mission.tasks.length > 0)
+
+  return {
+    id,
+    title,
+    goal: asString(rawUnit.goal, `${title} 수행에 필요한 실습 목표를 달성합니다.`),
+    requiredConcepts: normalizeStringArray(rawUnit.requiredConcepts, ['문제 정의', 'AI 활용']),
+    missions,
+  }
+}
+
+function normalizeMission(value, index) {
+  const rawMission = asObject(value)
+  const id = asString(rawMission.id, `M${index + 1}`)
+  const title = stripLeadingId(asString(rawMission.title, `미션 ${index + 1}`))
+  const tasks = asArray(rawMission.tasks).slice(0, 4).map((task, taskIndex) => normalizeTask(task, taskIndex))
+
+  return {
+    id,
+    title,
+    goal: asString(rawMission.goal, `${title}을 완료합니다.`),
+    tasks,
+  }
+}
+
+function normalizeTask(value, index) {
+  const rawTask = asObject(value)
+  const id = asString(rawTask.id, `P${index + 1}`)
+  const title = stripLeadingId(asString(rawTask.title, `문제 ${index + 1} 수행하기`))
+  const requiredTechnologies = normalizeRequiredTechnologies(rawTask.requiredTechnologies)
+
+  return {
+    id,
+    title,
+    description: asString(rawTask.description, `${title}를 수행합니다.`),
+    output: asString(rawTask.output, `${title} 결과물`),
+    assessmentCriteria: normalizeStringArray(rawTask.assessmentCriteria, ['산출물이 요구사항을 충족하는가']),
+    requiredTechnologies,
+    requiredTags: normalizeTags(asArray(rawTask.requiredTags), buildFallbackTags(requiredTechnologies)),
+    estimatedTime: asString(rawTask.estimatedTime, '20분'),
+    difficultyLevel: normalizeDifficultyLevel(rawTask.difficultyLevel),
+  }
+}
+
+function normalizeRequiredTechnologies(value) {
+  const technologies = asArray(value)
+    .map((item) => asObject(item))
+    .filter((item) => asString(item.name, '') !== '')
+    .map((item) => ({
+      name: asString(item.name, 'AI 활용'),
+      category: asString(item.category, 'AI 앱·에이전트'),
+      reason: asString(item.reason, `${asString(item.name, '해당 기술')}을 활용해 Task를 수행하기 위해 필요합니다.`),
+    }))
+
+  const fallbackTechnologies = [
+    { name: 'AI 활용', category: 'AI 앱·에이전트', reason: 'AI 도구를 활용해 결과를 점검하고 개선하기 위해 필요합니다.' },
+    { name: '문제 정의', category: '컴퓨팅공학 기초', reason: '수행할 문제와 산출물 기준을 명확히 정하기 위해 필요합니다.' },
+  ]
+
+  fallbackTechnologies.forEach((technology) => {
+    if (technologies.length < 2 && !technologies.some((item) => item.name === technology.name)) {
+      technologies.push(technology)
+    }
+  })
+
+  return technologies.slice(0, 5)
+}
+
+function normalizeProjectOverview(value, plan) {
+  const rawOverview = asObject(value)
+  return {
+    projectTitle: asString(rawOverview.projectTitle, `${plan.subject.title} 프로젝트`),
+    totalDuration: asString(rawOverview.totalDuration, '6주'),
+    teamComposition: asString(rawOverview.teamComposition, '개인 또는 2~3인 팀'),
+    difficultyLevel: normalizeDifficultyLevel(rawOverview.difficultyLevel),
+    projectGoal: asString(rawOverview.projectGoal, `${plan.subject.problemContext}를 AI와 데이터 활용으로 해결합니다.`),
+    finalOutput: asString(rawOverview.finalOutput, plan.subject.finalOutput),
+    constraints: asString(rawOverview.constraints, '비식별·가상 데이터만 사용하고, 결과 근거와 한계를 함께 설명합니다.'),
+    evaluationCriteria: asString(rawOverview.evaluationCriteria, '문제 이해, 기술 활용, 산출물 완성도, 결과 해석, 피드백 반영을 평가합니다.'),
+    missionList: asString(rawOverview.missionList, plan.units.map((unit) => `${unit.id}. ${unit.title}`).join('\n')),
+  }
+}
+
+function buildExcelRows(plan) {
+  return plan.units.flatMap((unit) =>
+    unit.missions.flatMap((mission) =>
+      mission.tasks.map((task) => ({
+        courseName: plan.courseName,
+        curriculumName: plan.curriculumName,
+        subjectTitle: plan.subject.title,
+        subjectSummary: plan.subject.summary,
+        unitId: unit.id,
+        unitTitle: unit.title,
+        unitGoal: unit.goal,
+        missionId: mission.id,
+        missionTitle: mission.title,
+        missionGoal: mission.goal,
+        taskId: task.id,
+        taskTitle: task.title,
+        taskDescription: task.description,
+        output: task.output,
+        requiredTechnologiesText: task.requiredTechnologies.map((technology) => technology.name).join(', '),
+        requiredTagsText: task.requiredTags.join(' '),
+        assessmentCriteriaText: task.assessmentCriteria.join(' / '),
+        firstEvaluation: '문제 평가',
+        secondEvaluation: '미션별 루브릭',
+        thirdEvaluation: '단원별 루브릭',
+        finalResult: 'PASS/FAIL',
+        estimatedTime: task.estimatedTime,
+        difficultyLevel: task.difficultyLevel,
+      })),
+    ),
+  )
+}
+
+function buildMissionSheets(rawMissionSheets, plan) {
+  const sheets = asArray(rawMissionSheets).map((sheet) => asObject(sheet))
+  return plan.units.map((unit) => {
+    const rawSheet = sheets.find((sheet) => asString(sheet.unitId, '') === unit.id) || {}
+    const unitTechnologies = [...new Set(unit.missions.flatMap((mission) =>
+      mission.tasks.flatMap((task) => task.requiredTechnologies.map((technology) => technology.name)),
+    ))]
+
+    return {
+      unitId: unit.id,
+      unitTitle: unit.title,
+      overview: asString(rawSheet.overview, `${unit.title}에서 ${unit.goal} 실제 수행합니다.`),
+      learningGoals: normalizeStringArray(rawSheet.learningGoals, [`${unit.title}에 필요한 데이터를 정리할 수 있다`, '산출물을 근거와 함께 설명할 수 있다']).slice(0, 4),
+      prerequisiteLessons: normalizeStringArray(rawSheet.prerequisiteLessons, unit.requiredConcepts),
+      techStack: normalizeStringArray(rawSheet.techStack, unitTechnologies.length ? unitTechnologies : ['AI 활용']),
+      pblProblem: asString(rawSheet.pblProblem, plan.subject.problemContext),
+      missionStatement: asString(rawSheet.missionStatement, `${unit.title}의 핵심 산출물을 완성하세요.`),
+      fiveStepGuide: normalizeFiveStepGuide(rawSheet.fiveStepGuide, unit),
+      submissions: normalizeStringArray(rawSheet.submissions, ['실습 결과물', '요약 보고서']).slice(0, 5),
+      evaluationRubric: normalizeEvaluationRubric(rawSheet.evaluationRubric),
+      aiUsageGuide: normalizeAiUsageGuide(rawSheet.aiUsageGuide),
+    }
+  })
+}
+
+function normalizeFiveStepGuide(value, unit) {
+  const rawSteps = asArray(value).map((step) => asObject(step))
+  const fallbackTitles = ['문제 확인', '데이터 준비', '실습 수행', '결과 점검', '산출물 정리']
+
+  return Array.from({ length: 5 }, (_, index) => {
+    const rawStep = rawSteps[index] || {}
+    return {
+      step: asString(rawStep.step, `Step ${index + 1}`),
+      title: asString(rawStep.title, fallbackTitles[index]),
+      actions: normalizeStringArray(rawStep.actions, [`${unit.title} ${fallbackTitles[index]} 수행`]),
+      output: asString(rawStep.output, `${fallbackTitles[index]} 결과물`),
+    }
+  })
+}
+
+function normalizeEvaluationRubric(value) {
+  const rubrics = asArray(value).map((rubric, index) => {
+    const rawRubric = asObject(rubric)
+    return {
+      area: asString(rawRubric.area, index === 0 ? '완성도 평가' : '피드백 반영'),
+      question: asString(rawRubric.question, index === 0 ? '산출물이 요구사항을 충족했는가?' : '피드백을 반영해 개선했는가?'),
+      passCriteria: normalizeStringArray(rawRubric.passCriteria, ['필수 산출물과 근거가 포함되어 있다']),
+      resultOptions: ['PASS', 'FAIL'],
+    }
+  })
+
+  while (rubrics.length < 2) {
+    rubrics.push({
+      area: rubrics.length === 0 ? '완성도 평가' : '피드백 반영',
+      question: rubrics.length === 0 ? '산출물이 요구사항을 충족했는가?' : '피드백을 반영해 개선했는가?',
+      passCriteria: ['필수 기준을 충족했다'],
+      resultOptions: ['PASS', 'FAIL'],
+    })
+  }
+
+  return rubrics
+}
+
+function normalizeAiUsageGuide(value) {
+  const rawGuide = asObject(value)
+  return {
+    allowedUses: normalizeAiUsageExamples(rawGuide.allowedUses, [
+      { title: '오류 원인 질문', examplePrompt: '이 오류가 발생한 원인을 쉬운 말로 설명해줘.' },
+      { title: '보고서 목차 제안', examplePrompt: '이 분석 결과를 보고서 목차로 정리해줘.' },
+    ]),
+    prohibitedUses: normalizeAiUsageExamples(rawGuide.prohibitedUses, [
+      { title: '전체 코드 대리 생성', examplePrompt: '전체 실습 코드를 대신 작성해줘.' },
+      { title: '결과 조작', examplePrompt: '평가가 잘 나오도록 결과를 바꿔줘.' },
+    ]),
+    principles: normalizeStringArray(rawGuide.principles, ['출처 명시', '실행 검증', '이해 후 사용', '자신의 언어로 재작성']),
+  }
+}
+
+function normalizeAiUsageExamples(value, fallbackExamples) {
+  const examples = asArray(value)
+    .map((example) => asObject(example))
+    .map((example, index) => ({
+      title: asString(example.title, fallbackExamples[index]?.title || 'AI 활용'),
+      examplePrompt: asString(example.examplePrompt, fallbackExamples[index]?.examplePrompt || '이 작업을 점검해줘.'),
+    }))
+
+  return examples.length ? examples : fallbackExamples
+}
+
+function normalizeDifficultyLevel(value) {
+  const text = asString(value, '초급')
+  if (text.includes('고급')) return '고급'
+  if (text.includes('중급')) return '중급'
+  return '초급'
+}
+
+function normalizeTags(value, fallbackTags) {
+  const tags = normalizeStringArray(value, fallbackTags).map((tag) => {
+    const trimmed = tag.replace(/\s+/g, '').trim()
+    return trimmed.startsWith('#') ? trimmed : `#${trimmed}`
+  })
+
+  fallbackTags.forEach((tag) => {
+    const normalizedTag = tag.startsWith('#') ? tag : `#${tag}`
+    if (tags.length < 3 && !tags.includes(normalizedTag)) tags.push(normalizedTag)
+  })
+
+  return tags.slice(0, Math.max(3, tags.length))
+}
+
+function buildFallbackTags(technologies) {
+  return [...technologies.map((technology) => `#${technology.name.replace(/\s+/g, '')}`), '#AI활용', '#PBL']
+}
+
+function normalizeStringArray(value, fallbackItems) {
+  const items = asArray(value)
+    .map((item) => asString(item, ''))
+    .filter(Boolean)
+
+  return items.length ? items : fallbackItems
+}
+
+function asObject(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : {}
+}
+
+function asArray(value) {
+  return Array.isArray(value) ? value : []
+}
+
+function asString(value, fallback) {
+  return typeof value === 'string' && value.trim() ? value.trim() : fallback
+}
+
+function stripLeadingId(value) {
+  return value.replace(/^[UMP]\d+\.\s*/i, '').trim()
 }
 
 function safeJsonParse(value) {
