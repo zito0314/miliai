@@ -153,7 +153,7 @@
 .pbl-generator-inner {
   width: min(1440px, calc(100% - 48px));
   margin: 0 auto;
-  padding: 28px 0 30px;
+  padding: 42px 0 46px;
 }
 
 .pbl-generator-heading {
@@ -163,15 +163,15 @@
 }
 
 .pbl-generator-icon {
-  width: 40px;
-  height: 40px;
+  width: 48px;
+  height: 48px;
   border-radius: 8px;
   display: grid;
   place-items: center;
   flex: 0 0 auto;
   background: #e5efec;
   color: var(--green);
-  font-size: 18px;
+  font-size: 20px;
 }
 
 .pbl-generator-heading > div > span,
@@ -182,27 +182,27 @@
 }
 
 .pbl-generator-heading h2 {
-  margin: 3px 0 4px;
+  margin: 4px 0 6px;
   color: var(--navy);
-  font-size: 21px;
+  font-size: 24px;
 }
 
 .pbl-generator-heading p {
   margin: 0;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .pbl-generator-form {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 10px;
-  margin-top: 18px;
+  margin-top: 26px;
 }
 
 .pbl-generator-form .ant-input,
 .pbl-generator-form .ant-btn {
-  min-height: 48px;
+  min-height: 56px;
 }
 
 .pbl-generator-form .ant-btn {
@@ -1062,6 +1062,7 @@ mark {
 
   .pbl-generator-inner {
     width: min(100% - 28px, 1440px);
+    padding: 30px 0 34px;
   }
 
   .pbl-generator-form {

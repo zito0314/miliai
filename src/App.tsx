@@ -128,6 +128,7 @@ function App() {
   return (
     <div className="app-shell">
       <Header />
+      <PblGenerator techItems={techItems} isTechItemsLoading={loading} />
       <SearchBar value={query} resultCount={filteredItems.length} onChange={setQuery} />
       <DataStatusBar
         loading={loading}
@@ -136,7 +137,6 @@ function App() {
         itemCount={techItems.length}
         onRefresh={() => void loadTechItems()}
       />
-      <PblGenerator techItems={techItems} isTechItemsLoading={loading} />
 
       <main className="workspace">
         <aside className="filter-sidebar" aria-label="검색 필터">

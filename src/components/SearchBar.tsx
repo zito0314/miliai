@@ -14,7 +14,7 @@ export function SearchBar({ value, resultCount, onChange }: SearchBarProps) {
     <section className="search-section" aria-label="기술 검색">
       <div className="search-inner">
         <label className="search-label" htmlFor="tech-search">
-          어떤 프로젝트를 기획하고 있나요?
+          기술 검색
         </label>
         <Input
           id="tech-search"
