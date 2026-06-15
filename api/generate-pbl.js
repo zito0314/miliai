@@ -395,13 +395,18 @@ function buildMissionSheets(rawMissionSheets, plan) {
       unitId: unit.id,
       unitTitle: unit.title,
       overview: asString(rawSheet.overview, `${unit.title}에서 ${unit.goal} 실제 수행합니다.`),
-      learningGoals: normalizeStringArray(rawSheet.learningGoals, [`${unit.title}에 필요한 데이터를 정리할 수 있다`, '산출물을 근거와 함께 설명할 수 있다']).slice(0, 4),
+      learningGoals: normalizeStringArray(
+        rawSheet.learningGoals,
+        [`${unit.title}에 필요한 데이터를 정리할 수 있다`, '산출물을 근거와 함께 설명할 수 있다'],
+        2,
+        4,
+      ),
       prerequisiteLessons: normalizeStringArray(rawSheet.prerequisiteLessons, unit.requiredConcepts),
       techStack: normalizeStringArray(rawSheet.techStack, unitTechnologies.length ? unitTechnologies : ['AI 활용']),
       pblProblem: asString(rawSheet.pblProblem, plan.subject.problemContext),
       missionStatement: asString(rawSheet.missionStatement, `${unit.title}의 핵심 산출물을 완성하세요.`),
       fiveStepGuide: normalizeFiveStepGuide(rawSheet.fiveStepGuide, unit),
-      submissions: normalizeStringArray(rawSheet.submissions, ['실습 결과물', '요약 보고서']).slice(0, 5),
+      submissions: normalizeStringArray(rawSheet.submissions, ['실습 결과물', '요약 보고서'], 2, 5),
       evaluationRubric: normalizeEvaluationRubric(rawSheet.evaluationRubric),
       aiUsageGuide: normalizeAiUsageGuide(rawSheet.aiUsageGuide),
     }
@@ -457,7 +462,7 @@ function normalizeAiUsageGuide(value) {
       { title: '전체 코드 대리 생성', examplePrompt: '전체 실습 코드를 대신 작성해줘.' },
       { title: '결과 조작', examplePrompt: '평가가 잘 나오도록 결과를 바꿔줘.' },
     ]),
-    principles: normalizeStringArray(rawGuide.principles, ['출처 명시', '실행 검증', '이해 후 사용', '자신의 언어로 재작성']),
+    principles: normalizeStringArray(rawGuide.principles, ['출처 명시', '실행 검증', '이해 후 사용', '자신의 언어로 재작성'], 4),
   }
 }
 
@@ -497,12 +502,26 @@ function buildFallbackTags(technologies) {
   return [...technologies.map((technology) => `#${technology.name.replace(/\s+/g, '')}`), '#AI활용', '#PBL']
 }
 
-function normalizeStringArray(value, fallbackItems) {
+function normalizeStringArray(value, fallbackItems, minimum = 1, maximum = Infinity) {
   const items = asArray(value)
     .map((item) => asString(item, ''))
     .filter(Boolean)
 
-  return items.length ? items : fallbackItems
+  const normalizedItems = [...items]
+  const fallbackValues = fallbackItems.length ? fallbackItems : ['항목']
+  let fallbackIndex = 0
+
+  while (normalizedItems.length < minimum) {
+    const nextFallback = fallbackValues[fallbackIndex % fallbackValues.length]
+    if (!normalizedItems.includes(nextFallback)) {
+      normalizedItems.push(nextFallback)
+    } else {
+      normalizedItems.push(`${nextFallback} ${fallbackIndex + 1}`)
+    }
+    fallbackIndex += 1
+  }
+
+  return normalizedItems.slice(0, maximum)
 }
 
 function asObject(value) {
