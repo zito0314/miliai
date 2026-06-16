@@ -1,21 +1,33 @@
-import { useState } from 'react'
-import { CopyOutlined, DownloadOutlined, UnorderedListOutlined } from '@ant-design/icons'
-import { Alert, Button, Segmented, Tag, message } from 'antd'
-import type { PblPlan } from '../types/pbl'
-import { copyExcelRowsAsTsv } from '../utils/copyPblPlanAsTsv'
+import { useMemo, useState } from 'react'
+import { CopyOutlined, DownloadOutlined } from '@ant-design/icons'
+import { Alert, Button, Tabs, Tag, message } from 'antd'
+import type { ExcelWorkbookSheet, PblPlan } from '../types/pbl'
+import { copyWorkbookAsTsv, copyWorkbookSheetAsTsv } from '../utils/copyPblPlanAsTsv'
 import { downloadJson } from '../utils/downloadJson'
 import { PblPlanTable } from './PblPlanTable'
 
-type ViewMode = '계층 보기' | '엑셀 표 보기'
-
 export function PblPlanResult({ plan }: { plan: PblPlan }) {
-  const [viewMode, setViewMode] = useState<ViewMode>('계층 보기')
+  const [activeSheetName, setActiveSheetName] = useState(plan.excelWorkbook.sheets[0]?.sheetName || '')
   const [messageApi, contextHolder] = message.useMessage()
+  const activeSheet = useMemo(
+    () => plan.excelWorkbook.sheets.find((sheet) => sheet.sheetName === activeSheetName) || plan.excelWorkbook.sheets[0],
+    [activeSheetName, plan.excelWorkbook.sheets],
+  )
 
-  const handleCopy = async () => {
+  const handleCopySheet = async (sheet: ExcelWorkbookSheet | undefined) => {
+    if (!sheet) return
     try {
-      await copyExcelRowsAsTsv(plan.excelRows)
-      messageApi.success('엑셀 형태로 복사했어요. Google Sheets에 바로 붙여넣을 수 있습니다.')
+      await copyWorkbookSheetAsTsv(sheet)
+      messageApi.success(`${sheet.sheetName} 시트를 엑셀 형태로 복사했어요.`)
+    } catch {
+      messageApi.error('클립보드에 복사하지 못했어요.')
+    }
+  }
+
+  const handleCopyWorkbook = async () => {
+    try {
+      await copyWorkbookAsTsv(plan.excelWorkbook)
+      messageApi.success('전체 시트를 엑셀 형태로 복사했어요.')
     } catch {
       messageApi.error('클립보드에 복사하지 못했어요.')
     }
@@ -25,17 +37,16 @@ export function PblPlanResult({ plan }: { plan: PblPlan }) {
     <section className="pbl-result" aria-label="생성된 PBL 과정설계">
       {contextHolder}
       <div className="pbl-result-toolbar">
-        <Segmented<ViewMode>
-          value={viewMode}
-          options={[
-            { label: '계층 보기', value: '계층 보기', icon: <UnorderedListOutlined /> },
-            { label: '엑셀 표 보기', value: '엑셀 표 보기' },
-          ]}
-          onChange={setViewMode}
-        />
+        <div className="pbl-result-heading">
+          <span>PBL 템플릿 워크북</span>
+          <h2>{plan.projectOverview.projectTitle}</h2>
+        </div>
         <div className="pbl-result-actions">
-          <Button icon={<CopyOutlined />} onClick={() => void handleCopy()}>
-            엑셀 형태로 복사
+          <Button icon={<CopyOutlined />} onClick={() => void handleCopySheet(activeSheet)}>
+            선택 시트 엑셀로 복사
+          </Button>
+          <Button icon={<CopyOutlined />} onClick={() => void handleCopyWorkbook()}>
+            전체 시트 엑셀로 복사
           </Button>
           <Button icon={<DownloadOutlined />} onClick={() => downloadJson(plan)}>
             JSON 다운로드
@@ -43,42 +54,33 @@ export function PblPlanResult({ plan }: { plan: PblPlan }) {
         </div>
       </div>
 
-      <div className="pbl-summary">
+      <div className="pbl-summary workbook-summary">
         <div className="pbl-summary-main">
-          <span>과정</span>
-          <h2>{plan.courseName}</h2>
+          <span>프로젝트개요</span>
           <dl>
             <div>
-              <dt>프로젝트</dt>
-              <dd>{plan.projectOverview.projectTitle}</dd>
+              <dt>과정</dt>
+              <dd>{plan.courseName}</dd>
             </div>
             <div>
               <dt>커리큘럼</dt>
               <dd>{plan.curriculumName}</dd>
             </div>
             <div>
-              <dt>과목</dt>
-              <dd>{plan.subject.title}</dd>
-            </div>
-            <div>
-              <dt>과목 요약</dt>
-              <dd>{plan.subject.summary}</dd>
-            </div>
-            <div>
-              <dt>문제 상황</dt>
-              <dd>{plan.subject.problemContext}</dd>
-            </div>
-            <div>
-              <dt>최종 산출물</dt>
-              <dd>{plan.subject.finalOutput}</dd>
+              <dt>과목명</dt>
+              <dd>{plan.subjectName}</dd>
             </div>
             <div>
               <dt>프로젝트 목표</dt>
               <dd>{plan.projectOverview.projectGoal}</dd>
             </div>
             <div>
-              <dt>제약 조건</dt>
-              <dd>{plan.projectOverview.constraints}</dd>
+              <dt>최종 산출물</dt>
+              <dd>{plan.projectOverview.finalOutput}</dd>
+            </div>
+            <div>
+              <dt>미션지 구성</dt>
+              <dd>{plan.missionSheetCountReason}</dd>
             </div>
           </dl>
         </div>
@@ -86,11 +88,12 @@ export function PblPlanResult({ plan }: { plan: PblPlan }) {
           <div className="pbl-project-facts">
             <span>기간 <strong>{plan.projectOverview.totalDuration}</strong></span>
             <span>팀 구성 <strong>{plan.projectOverview.teamComposition}</strong></span>
-            <span>난이도 <strong>{plan.projectOverview.difficultyLevel}</strong></span>
+            <span>난이도 <strong>{plan.projectOverview.difficultyLevelNumber}레벨 / {plan.projectOverview.difficultyLevelLabel}</strong></span>
+            <span>미션지 <strong>{plan.missionSheetCount}개</strong></span>
           </div>
-          <span>추천 기술 태그</span>
+          <span>생성된 시트</span>
           <div>
-            {plan.subject.recommendedTags.map((tag) => <Tag key={tag}>{tag}</Tag>)}
+            {plan.excelWorkbook.sheets.map((sheet) => <Tag key={sheet.sheetName}>{sheet.sheetName}</Tag>)}
           </div>
         </div>
       </div>
@@ -99,90 +102,19 @@ export function PblPlanResult({ plan }: { plan: PblPlan }) {
         className="pbl-draft-alert"
         type="info"
         showIcon
-        title="AI가 생성한 과정설계 초안입니다. 교육 목표와 실제 데이터 환경에 맞게 검토·수정해주세요."
+        message="AI가 생성한 기획자용 PBL 템플릿 초안입니다. 실제 교육 목표, 데이터 환경, 보안 기준에 맞게 검토·수정해주세요."
       />
 
-      {viewMode === '엑셀 표 보기' ? <PblPlanTable rows={plan.excelRows} /> : <PblHierarchy plan={plan} />}
+      <Tabs
+        className="workbook-tabs"
+        activeKey={activeSheet?.sheetName}
+        onChange={setActiveSheetName}
+        items={plan.excelWorkbook.sheets.map((sheet) => ({
+          key: sheet.sheetName,
+          label: sheet.sheetName,
+          children: <PblPlanTable sheet={sheet} />,
+        }))}
+      />
     </section>
-  )
-}
-
-function PblHierarchy({ plan }: { plan: PblPlan }) {
-  return (
-    <div className="pbl-hierarchy">
-      {plan.units.map((unit) => (
-        <section className="pbl-unit" key={unit.id}>
-          <div className="pbl-unit-heading">
-            <span>{unit.id}</span>
-            <div>
-              <h3>{unit.title}</h3>
-              <p><strong>목표</strong> {unit.goal}</p>
-              <div className="concept-list">
-                {unit.requiredConcepts.map((concept) => <Tag key={concept}>{concept}</Tag>)}
-              </div>
-            </div>
-          </div>
-
-          <div className="pbl-mission-list">
-            {unit.missions.map((mission) => (
-              <section className="pbl-mission" key={`${unit.id}-${mission.id}`}>
-                <div className="pbl-mission-heading">
-                  <span>{mission.id}</span>
-                  <div>
-                    <h4>{mission.title}</h4>
-                    <p><strong>목표</strong> {mission.goal}</p>
-                  </div>
-                </div>
-
-                <div className="pbl-task-list">
-                  {mission.tasks.map((task) => (
-                    <article className="pbl-task" key={`${unit.id}-${mission.id}-${task.id}`}>
-                      <div className="pbl-task-title">
-                        <span>{task.id}</span>
-                        <h5>{task.title}</h5>
-                      </div>
-                      <p>{task.description}</p>
-                      <div className="pbl-task-meta">
-                        <Tag>{task.estimatedTime}</Tag>
-                        <Tag>{task.difficultyLevel}</Tag>
-                      </div>
-                      <dl>
-                        <div>
-                          <dt>산출물</dt>
-                          <dd>{task.output}</dd>
-                        </div>
-                        <div>
-                          <dt>평가 기준</dt>
-                          <dd>
-                            <ul>{task.assessmentCriteria.map((criterion) => <li key={criterion}>{criterion}</li>)}</ul>
-                          </dd>
-                        </div>
-                      </dl>
-                      <div className="pbl-task-technologies">
-                        <strong>필요 기술</strong>
-                        <div className="pbl-technology-list">
-                          {task.requiredTechnologies.map((technology) => (
-                            <div className="pbl-technology" key={`${task.id}-${technology.name}`}>
-                              <div>
-                                <strong>{technology.name}</strong>
-                                <Tag>{technology.category}</Tag>
-                              </div>
-                              <p>{technology.reason}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="pbl-task-tags">
-                        {task.requiredTags.map((tag) => <Tag key={tag}>{tag}</Tag>)}
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              </section>
-            ))}
-          </div>
-        </section>
-      ))}
-    </div>
   )
 }

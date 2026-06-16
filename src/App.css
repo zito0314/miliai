@@ -232,8 +232,22 @@
   gap: 16px;
 }
 
+.pbl-result-heading span {
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.pbl-result-heading h2 {
+  margin: 4px 0 0;
+  color: #17211f;
+  font-size: 22px;
+  line-height: 1.35;
+}
+
 .pbl-result-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -338,6 +352,19 @@
 
 .pbl-draft-alert {
   margin: 18px 0;
+}
+
+.workbook-tabs {
+  margin-top: 18px;
+}
+
+.workbook-tabs .ant-tabs-nav {
+  margin-bottom: 12px;
+}
+
+.workbook-tabs .ant-tabs-tab {
+  padding: 10px 0;
+  font-weight: 750;
 }
 
 .pbl-hierarchy {
@@ -555,7 +582,7 @@
   color: #4d5c57;
   font-size: 11px;
   line-height: 1.5;
-  white-space: normal;
+  white-space: pre-line;
 }
 
 .pbl-plan-table .ant-table-thead > tr > th {

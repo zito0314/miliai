@@ -1,116 +1,122 @@
-export type RequiredTechnology = {
-  name: string
-  category: string
-  reason: string
-}
-
-export type DifficultyLevel = '초급' | '중급' | '고급'
-
-export type PblTask = {
-  id: string
-  title: string
-  description: string
-  output: string
-  assessmentCriteria: string[]
-  requiredTechnologies: RequiredTechnology[]
-  requiredTags: string[]
-  estimatedTime: string
-  difficultyLevel: DifficultyLevel
-}
-
-export type PblMission = {
-  id: string
-  title: string
-  goal: string
-  tasks: PblTask[]
-}
-
-export type PblUnit = {
-  id: string
-  title: string
-  goal: string
-  requiredConcepts: string[]
-  missions: PblMission[]
-}
+export type DifficultyLevelLabel = '초급' | '중급' | '고급' | '마스터'
+export type PassFail = 'PASS' | 'FAIL'
 
 export type PblPlan = {
   courseName: string
   curriculumName: string
-  projectOverview: {
-    projectTitle: string
-    totalDuration: string
-    teamComposition: string
-    difficultyLevel: DifficultyLevel
-    projectGoal: string
-    finalOutput: string
-    constraints: string
-    evaluationCriteria: string
-    missionList: string
-  }
-  subject: {
-    id: string
-    title: string
-    summary: string
-    problemContext: string
-    finalOutput: string
-    recommendedTags: string[]
-  }
-  units: PblUnit[]
-  excelRows: PblExcelRow[]
+  subjectName: string
+  missionSheetCount: number
+  missionSheetCountReason: string
+  projectOverview: ProjectOverview
   missionSheets: MissionSheet[]
+  projectEvaluationSummary: ProjectEvaluationSummary
+  references: PblReferences
+  excelWorkbook: ExcelWorkbook
 }
 
-export type PblExcelRow = {
-  courseName: string
-  curriculumName: string
-  subjectTitle: string
-  subjectSummary: string
-  unitId: string
-  unitTitle: string
-  unitGoal: string
-  missionId: string
-  missionTitle: string
-  missionGoal: string
-  taskId: string
-  taskTitle: string
-  taskDescription: string
-  output: string
-  requiredTechnologiesText: string
-  requiredTagsText: string
-  assessmentCriteriaText: string
-  firstEvaluation: string
-  secondEvaluation: string
-  thirdEvaluation: string
-  finalResult: string
-  estimatedTime: string
-  difficultyLevel: DifficultyLevel
+export type ProjectOverview = {
+  projectTitle: string
+  totalDuration: string
+  teamComposition: string
+  difficultyLevelNumber: number
+  difficultyLevelLabel: DifficultyLevelLabel
+  difficultyDescription: string
+  difficultyReason: string
+  difficultyReviewNote: string
+  projectGoal: string
+  finalOutput: string
+  constraints: string
+  evaluationCriteria: string
+  subMissionList: string[]
 }
 
 export type MissionSheet = {
-  unitId: string
-  unitTitle: string
+  sheetName: string
+  missionStageName: string
+  duration: string
   overview: string
   learningGoals: string[]
-  prerequisiteLessons: string[]
-  techStack: string[]
-  pblProblem: string
+  prerequisiteLessons: Array<{
+    title: string
+    reason: string
+  }>
+  techStack: Array<{
+    name: string
+    category: string
+    usage: string
+    tags: string[]
+  }>
+  pblProblem: {
+    problemSituation: string
+    mission: string
+  }
   missionStatement: string
   fiveStepGuide: Array<{
     step: string
     title: string
+    description: string
     actions: string[]
     output: string
+    checkPoint: string
+    recommendedTools: string[]
+    estimatedTime: string
   }>
-  submissions: string[]
-  evaluationRubric: Array<{
+  submissions: Array<{
+    title: string
+    format: string
+    detailList: string[]
+    passCondition: string
+  }>
+  evaluationCriteria: Array<{
     area: string
+    weight: string
     question: string
     passCriteria: string[]
-    resultOptions: Array<'PASS' | 'FAIL'>
+    resultOptions: PassFail[]
   }>
   aiUsageGuide: {
     allowedUses: Array<{ title: string; examplePrompt: string }>
     prohibitedUses: Array<{ title: string; examplePrompt: string }>
     principles: string[]
   }
+}
+
+export type ProjectEvaluationSummary = {
+  evaluationOverview: string
+  evaluationItems: Array<{
+    area: string
+    question: string
+    passCriteria: string[]
+    evidence: string
+    resultOptions: PassFail[]
+  }>
+  finalPassCriteria: string[]
+  peerReviewQuestions: string[]
+  aiTutorReviewQuestions: string[]
+  improvementQuestions: string[]
+}
+
+export type PblReferences = {
+  recommendedVodTopics: string[]
+  recommendedDatasets: Array<{
+    name: string
+    usage: string
+    note: string
+  }>
+  recommendedTools: string[]
+  recommendedReadings: string[]
+  relatedSkills: Array<{
+    skill: string
+    tags: string[]
+  }>
+  searchKeywords: string[]
+}
+
+export type ExcelWorkbook = {
+  sheets: ExcelWorkbookSheet[]
+}
+
+export type ExcelWorkbookSheet = {
+  sheetName: string
+  rows: string[][]
 }

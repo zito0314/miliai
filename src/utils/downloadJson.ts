@@ -5,7 +5,7 @@ export function downloadJson(plan: PblPlan) {
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
   anchor.href = url
-  anchor.download = `pbl-plan-${toFileName(plan.subject.title)}.json`
+  anchor.download = `pbl-plan-${toFileName(plan.projectOverview.projectTitle || plan.subjectName)}.json`
   document.body.appendChild(anchor)
   anchor.click()
   anchor.remove()
