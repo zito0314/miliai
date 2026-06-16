@@ -14,6 +14,8 @@ const answerGuideResponseSchema = z.object({
   answerGuides: z.array(answerGuideSchema).min(1),
 })
 
+const transientRetryDelaysMs = [1200, 2800]
+
 const responseJsonSchema = z.toJSONSchema(answerGuideResponseSchema, { target: 'draft-7' })
 delete responseJsonSchema.$schema
 simplifyGeminiSchema(responseJsonSchema)
@@ -45,18 +47,21 @@ export default async function handler(request, response) {
   try {
     const ai = new GoogleGenAI({ apiKey })
     const model = process.env.GEMINI_MODEL?.trim() || 'gemini-2.5-flash'
-    const result = await ai.models.generateContent({
+    const result = await generateContentWithRetry(ai, {
       model,
-      contents: buildAnswerGuidePrompt({
-        currentPlan,
-        targetMissionSheets,
-        techContext: buildTechContext(body),
-      }),
-      config: {
-        temperature: 0.25,
-        maxOutputTokens: targetMissionSheets.length === 1 ? 12000 : 30000,
-        responseMimeType: 'application/json',
-        responseJsonSchema,
+      request: {
+        model,
+        contents: buildAnswerGuidePrompt({
+          currentPlan,
+          targetMissionSheets,
+          techContext: buildTechContext(body),
+        }),
+        config: {
+          temperature: 0.25,
+          maxOutputTokens: targetMissionSheets.length === 1 ? 10000 : 24000,
+          responseMimeType: 'application/json',
+          responseJsonSchema,
+        },
       },
     })
 
@@ -97,10 +102,63 @@ export default async function handler(request, response) {
     })
   } catch (error) {
     console.error('Answer guide generation failed', error)
-    return response.status(502).json({
-      error: '예상 답안 생성 중 오류가 발생했어요. 잠시 후 다시 시도해주세요.',
-    })
+    const transientError = getTransientGeminiError(error)
+    if (transientError) {
+      return response.status(transientError.status).json({ error: transientError.message })
+    }
+
+    return response.status(502).json({ error: '예상 답안 생성 중 오류가 발생했어요. 잠시 후 다시 시도해주세요.' })
   }
+}
+
+async function generateContentWithRetry(ai, { model, request }) {
+  let lastError
+
+  for (let attempt = 0; attempt <= transientRetryDelaysMs.length; attempt += 1) {
+    try {
+      return await ai.models.generateContent(request)
+    } catch (error) {
+      lastError = error
+      const transientError = getTransientGeminiError(error)
+      const retryDelay = transientRetryDelaysMs[attempt]
+      if (!transientError || retryDelay === undefined) throw error
+
+      console.warn(`Answer guide Gemini ${model} transient error. Retrying in ${retryDelay}ms.`, {
+        status: transientError.status,
+        attempt: attempt + 1,
+      })
+      await delay(retryDelay)
+    }
+  }
+
+  throw lastError
+}
+
+function getTransientGeminiError(error) {
+  const status = Number(error?.status || error?.code || error?.error?.code)
+  const message = typeof error?.message === 'string' ? error.message : ''
+
+  if (status === 503 || message.includes('"code":503') || message.includes('UNAVAILABLE')) {
+    return {
+      status: 503,
+      message: '현재 Gemini 모델 요청이 많아 예상 답안을 생성하지 못했어요. 잠시 후 다시 시도하거나 미션지별 생성으로 나눠 시도해주세요.',
+    }
+  }
+
+  if (status === 429 || message.includes('"code":429') || message.includes('RESOURCE_EXHAUSTED')) {
+    return {
+      status: 429,
+      message: 'Gemini 사용량 또는 요청 한도에 도달했어요. 잠시 후 다시 시도하거나 미션지별 생성으로 나눠 시도해주세요.',
+    }
+  }
+
+  return null
+}
+
+function delay(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms)
+  })
 }
 
 function getTargetMissionSheets(plan, targetMissionSheetIndex) {

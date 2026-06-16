@@ -73,8 +73,12 @@ export function PblPlanResult({ plan, subjectName, techItems, historyCount, onPl
       const successMessage = targetMissionSheetIndex === undefined ? '예상 답안을 생성했어요.' : '이 미션지의 예상 답안을 생성했어요.'
       setLastChangeSummary(successMessage)
       messageApi.success(successMessage)
-    } catch {
-      setAnswerGuideError('예상 답안 생성 중 오류가 발생했어요.')
+    } catch (error) {
+      setAnswerGuideError(
+        error instanceof Error
+          ? error.message
+          : '예상 답안 생성 중 오류가 발생했어요.',
+      )
     } finally {
       setAnswerGuideGeneratingTarget(null)
     }
