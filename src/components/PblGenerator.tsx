@@ -49,7 +49,7 @@ export function PblGenerator({ techItems, isTechItemsLoading }: PblGeneratorProp
           <div>
             <span>AI 과정설계 도구</span>
             <h2>PBL 과정 자동 생성</h2>
-            <p>과목명을 입력하면 Unit, Mission, Problem/Task 초안을 생성합니다.</p>
+            <p>과목명을 입력하면 프로젝트개요, 미션지, 평가표, 참고자료 시트 초안을 생성합니다.</p>
           </div>
         </div>
 

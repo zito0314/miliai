@@ -1,30 +1,21 @@
-import type { PblPlan } from '../types/pbl'
-import { flattenPblPlan } from './flattenPblPlan'
+import type { ExcelWorkbook, ExcelWorkbookSheet } from '../types/pbl'
 
-const columns = [
-  'courseName',
-  'curriculumName',
-  'subjectTitle',
-  'unitId',
-  'unitTitle',
-  'missionId',
-  'missionTitle',
-  'taskId',
-  'taskTitle',
-  'description',
-  'output',
-  'assessmentCriteria',
-  'requiredTags',
-] as const
+export async function copyWorkbookSheetAsTsv(sheet: ExcelWorkbookSheet) {
+  await navigator.clipboard.writeText(sheetToTsv(sheet))
+}
 
-export async function copyPblPlanAsTsv(plan: PblPlan) {
-  const rows = flattenPblPlan(plan)
-  const tsv = [
-    columns.join('\t'),
-    ...rows.map((row) => columns.map((column) => sanitizeCell(row[column])).join('\t')),
-  ].join('\n')
+export async function copyWorkbookAsTsv(workbook: ExcelWorkbook) {
+  const tsv = workbook.sheets
+    .map((sheet) => [`[${sheet.sheetName}]`, sheetToTsv(sheet)].join('\n'))
+    .join('\n\n')
 
   await navigator.clipboard.writeText(tsv)
+}
+
+function sheetToTsv(sheet: ExcelWorkbookSheet) {
+  return sheet.rows
+    .map((row) => row.map(sanitizeCell).join('\t'))
+    .join('\n')
 }
 
 const sanitizeCell = (value: string) => value.replace(/[\t\r\n]+/g, ' ').trim()

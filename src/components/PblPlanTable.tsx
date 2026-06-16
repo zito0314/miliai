@@ -1,53 +1,34 @@
-import { Table, Tag } from 'antd'
+import { Table } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import type { PblPlan, PblPlanRow } from '../types/pbl'
-import { flattenPblPlan } from '../utils/flattenPblPlan'
+import type { ExcelWorkbookSheet } from '../types/pbl'
 
-const columns: ColumnsType<PblPlanRow> = [
-  { title: '과정', dataIndex: 'courseName', width: 180 },
-  { title: '커리큘럼', dataIndex: 'curriculumName', width: 180 },
-  { title: '과목(Subject)', dataIndex: 'subjectTitle', width: 190 },
-  {
-    title: '단원(Unit)',
-    width: 220,
-    render: (_, row) => `${row.unitId}. ${row.unitTitle}`,
-  },
-  {
-    title: '미션(Mission)',
-    width: 220,
-    render: (_, row) => `${row.missionId}. ${row.missionTitle}`,
-  },
-  {
-    title: '문제(Problem/Task)',
-    width: 300,
-    render: (_, row) => (
-      <div className="table-task-cell">
-        <strong>{row.taskId}. {row.taskTitle}</strong>
-        <span>{row.description}</span>
-        <small>산출물: {row.output}</small>
-      </div>
-    ),
-  },
-  {
-    title: '태그',
-    dataIndex: 'requiredTags',
-    width: 220,
-    render: (tags: string) => (
-      <div className="table-tag-cell">
-        {tags.split(' ').filter(Boolean).map((tag) => <Tag key={tag}>{tag}</Tag>)}
-      </div>
-    ),
-  },
-]
+type WorkbookTableRow = {
+  key: string
+  cells: string[]
+}
 
-export function PblPlanTable({ plan }: { plan: PblPlan }) {
+export function PblPlanTable({ sheet }: { sheet: ExcelWorkbookSheet }) {
+  const [headerRow = ['항목', '내용'], ...bodyRows] = sheet.rows
+  const columnCount = Math.max(headerRow.length, ...bodyRows.map((row) => row.length), 2)
+  const columns: ColumnsType<WorkbookTableRow> = Array.from({ length: columnCount }, (_, index) => ({
+    title: headerRow[index] || `컬럼 ${index + 1}`,
+    dataIndex: ['cells', index],
+    width: index === 0 ? 220 : 520,
+    render: (value: string) => <span className="excel-table-text">{value}</span>,
+  }))
+
+  const dataSource = bodyRows.map((row, index) => ({
+    key: `${sheet.sheetName}-${index}`,
+    cells: Array.from({ length: columnCount }, (_, cellIndex) => row[cellIndex] || ''),
+  }))
+
   return (
-    <Table<PblPlanRow>
-      className="pbl-plan-table"
+    <Table<WorkbookTableRow>
+      className="pbl-plan-table workbook-table"
       columns={columns}
-      dataSource={flattenPblPlan(plan)}
+      dataSource={dataSource}
       pagination={false}
-      scroll={{ x: 1510 }}
+      scroll={{ x: Math.max(columnCount * 420, 820) }}
       size="small"
     />
   )
