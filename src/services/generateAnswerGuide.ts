@@ -6,7 +6,7 @@ import { normalizePblPlan } from '../utils/normalizePblPlan'
 type GenerateAnswerGuideParams = {
   currentPlan: PblPlan
   techItems?: TechItem[]
-  targetMissionSheetIndex?: number
+  targetMissionIndex?: number
 }
 
 type GenerateAnswerGuideResponse = {
@@ -17,15 +17,15 @@ type GenerateAnswerGuideResponse = {
 export async function generateAnswerGuide({
   currentPlan,
   techItems = [],
-  targetMissionSheetIndex,
+  targetMissionIndex,
 }: GenerateAnswerGuideParams): Promise<GenerateAnswerGuideResponse> {
   const response = await fetch('/api/generate-answer-guide', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       currentPlan,
-      targetMissionSheetIndex,
-      techContext: buildTechContext(currentPlan.subjectName, techItems),
+      targetMissionIndex,
+      techContext: buildTechContext(currentPlan.project.title, techItems),
     }),
   })
 

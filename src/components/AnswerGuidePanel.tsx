@@ -37,8 +37,8 @@ export function AnswerGuidePanel({ answerGuides }: AnswerGuidePanelProps) {
       <Collapse
         className="answer-guide-collapse"
         items={answerGuides.map((guide) => ({
-          key: guide.sheetName,
-          label: `${guide.sheetName} · ${guide.missionStageName}`,
+          key: guide.mission_id,
+          label: `${guide.mission_id} · ${guide.mission_title}`,
           children: (
             <article className="answer-guide-content">
               <GuideBlock title="해설 요약">
@@ -67,7 +67,7 @@ export function AnswerGuidePanel({ answerGuides }: AnswerGuidePanelProps) {
                   renderItem={(item) => (
                     <List.Item>
                       <div className="answer-guide-list-item">
-                        <strong>{item.step} · {item.title}</strong>
+                        <strong>{item.step_id} · {item.title}</strong>
                         <p>{item.expectedResponse}</p>
                         <div className="answer-guide-tags">
                           {item.keyPoints.map((point) => <Tag key={point}>{point}</Tag>)}
@@ -84,7 +84,7 @@ export function AnswerGuidePanel({ answerGuides }: AnswerGuidePanelProps) {
                   <div className="answer-code-list">
                     {guide.codeExamples.map((codeExample) => (
                       <CodeExampleBlock
-                        key={`${guide.sheetName}-${codeExample.title}`}
+                        key={`${guide.mission_id}-${codeExample.title}`}
                         codeExample={codeExample}
                         onCopy={async () => {
                           try {

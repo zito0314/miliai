@@ -3,7 +3,7 @@ import type { TechItem } from './tech'
 
 export type RefineMode = 'full' | 'section' | 'text'
 
-export type RefineTargetType = 'projectOverview' | 'missionSheet' | 'projectEvaluationSummary' | 'references'
+export type RefineTargetType = 'project' | 'mission' | 'step' | 'submission' | 'validationChecklist'
 
 export type RefinePblPlanParams =
   | {

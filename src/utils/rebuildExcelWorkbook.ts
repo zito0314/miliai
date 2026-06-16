@@ -1,165 +1,256 @@
-import type { AnswerGuide, ExcelWorkbook, MissionSheet, PblPlan, PblReferences, ProjectEvaluationSummary } from '../types/pbl'
+import type {
+  EnvironmentTag,
+  ExcelWorkbook,
+  Mission,
+  PblPlan,
+  Step,
+  StepOption,
+  Submission,
+  UiBlockDictionaryItem,
+  ValidationChecklistItem,
+} from '../types/pbl'
+
+export const JSON_READY_WORKBOOK_SHEET_NAMES = [
+  '00_README',
+  '01_project',
+  '02_missions',
+  '03_steps',
+  '04_options',
+  '05_submissions',
+  '06_ui_block_dictionary',
+  '07_environment_tags',
+  '08_validation_checklist',
+  '09_export_map',
+  '99_json_preview',
+] as const
 
 export function rebuildExcelWorkbook(plan: PblPlan): ExcelWorkbook {
-  const answerGuideSheets = plan.answerGuides?.length
-    ? [{ sheetName: '기획자용 예상 답안', rows: buildAnswerGuideRows(plan.answerGuides) }]
-    : []
-
   return {
     sheets: [
-      { sheetName: '프로젝트개요', rows: buildProjectOverviewRows(plan) },
-      ...plan.missionSheets.map((sheet) => ({ sheetName: sheet.sheetName, rows: buildMissionSheetRows(sheet) })),
-      { sheetName: '전체 프로젝트 평가 종합', rows: buildProjectEvaluationRows(plan.projectEvaluationSummary) },
-      { sheetName: '참고자료', rows: buildReferenceRows(plan.references) },
-      ...answerGuideSheets,
+      { sheetName: '00_README', rows: buildReadmeRows() },
+      { sheetName: '01_project', rows: buildProjectRows(plan) },
+      { sheetName: '02_missions', rows: buildMissionRows(plan.missions) },
+      { sheetName: '03_steps', rows: buildStepRows(plan.missions) },
+      { sheetName: '04_options', rows: buildOptionRows(plan.missions) },
+      { sheetName: '05_submissions', rows: buildSubmissionRows(plan.missions) },
+      { sheetName: '06_ui_block_dictionary', rows: buildUiBlockRows(plan.ui_blocks) },
+      { sheetName: '07_environment_tags', rows: buildEnvironmentTagRows(plan.environment_tags) },
+      { sheetName: '08_validation_checklist', rows: buildValidationChecklistRows(plan.validation_checklist) },
+      { sheetName: '09_export_map', rows: buildExportMapRows() },
+      { sheetName: '99_json_preview', rows: buildJsonPreviewRows(plan) },
     ],
   }
 }
 
-function buildProjectOverviewRows(plan: PblPlan) {
-  const overview = plan.projectOverview
+function buildReadmeRows() {
   return [
-    ['항목', '내용'],
-    ['프로젝트명', overview.projectTitle],
-    ['총 소요 시간', overview.totalDuration],
-    ['팀 구성', overview.teamComposition],
-    ['난이도', `${overview.difficultyLevelNumber}레벨 / ${overview.difficultyLevelLabel}`],
-    ['난이도 설명', overview.difficultyDescription],
-    ['난이도 선정 이유', overview.difficultyReason],
-    ['기획자 검토 포인트', overview.difficultyReviewNote],
-    ['프로젝트 목표', overview.projectGoal],
-    ['최종 산출물', overview.finalOutput],
-    ['제약조건', overview.constraints],
-    ['평가기준', overview.evaluationCriteria],
-    ['하위미션 목록', overview.subMissionList.join('\n')],
-    ['미션지 개수', String(plan.missionSheetCount)],
-    ['미션지 개수 판단 이유', plan.missionSheetCountReason],
+    ['section', 'description'],
+    ['purpose', 'MiliAI PBL 콘텐츠를 플랫폼 DB 또는 JSON으로 변환하기 쉬운 정규화 구조로 정리한 workbook입니다.'],
+    ['generation_rule', 'Gemini는 JSON-ready 콘텐츠 본문만 생성하고, excelWorkbook은 서버 normalize/rebuild 단계에서 재생성합니다.'],
+    ['student_visible_fields', 'learner_text, student_instruction, evaluation_text는 학생에게 노출 가능한 문구입니다.'],
+    ['internal_fields', 'planner_note, developer_note는 기획자/개발자 내부 검토용이며 학생에게 노출하지 않습니다.'],
   ]
 }
 
-function buildMissionSheetRows(sheet: MissionSheet) {
+function buildProjectRows(plan: PblPlan) {
+  const header = [
+    'project_id',
+    'title',
+    'short_description',
+    'environment_type',
+    'duration_label',
+    'target_learner',
+    'difficulty_label',
+    'project_goal',
+    'learning_mode',
+    'prerequisites',
+    'tech_stack',
+    'final_outputs',
+    'constraints',
+    'pc_alternative',
+    'is_student_visible',
+    'content_status',
+    'planner_note',
+    'developer_note',
+  ]
+
   return [
-    ['항목', '내용'],
-    ['미션 단계명', sheet.missionStageName],
-    ['기간', sheet.duration],
-    ['차시 개요', sheet.overview],
-    ['학습 목표', sheet.learningGoals.join('\n')],
-    ['선행 학습 권장 과목', sheet.prerequisiteLessons.map((lesson) => `${lesson.title}: ${lesson.reason}`).join('\n')],
-    ['활용 기술 스택', sheet.techStack.map((technology) => `${technology.name} (${technology.category}): ${technology.usage} ${technology.tags.join(' ')}`).join('\n')],
-    ['PBL 문제 - 문제 상황', sheet.pblProblem.problemSituation],
-    ['PBL 문제 - 미션', sheet.pblProblem.mission],
-    ['5단계 실행 가이드', sheet.fiveStepGuide.map(formatStep).join('\n\n')],
-    ['제출물', sheet.submissions.map(formatSubmission).join('\n\n')],
-    ['평가 기준', sheet.evaluationCriteria.map(formatEvaluationCriterion).join('\n\n')],
-    ['AI 지시문 가이드', formatAiUsageGuide(sheet.aiUsageGuide)],
+    header,
+    header.map((key) => toCell(plan.project[key as keyof typeof plan.project])),
   ]
 }
 
-function buildProjectEvaluationRows(summary: ProjectEvaluationSummary) {
+function buildMissionRows(missions: Mission[]) {
+  const header = [
+    'project_id',
+    'mission_id',
+    'mission_order',
+    'title',
+    'environment_type',
+    'estimated_time',
+    'core_learning_action',
+    'student_outputs',
+    'planner_review_points',
+    'developer_note',
+    'mission_overview',
+    'learning_goal',
+    'prerequisites',
+    'tech_stack',
+    'constraints',
+    'is_pc_required',
+    'has_mobile_alternative',
+  ]
+
   return [
-    ['항목', '내용'],
-    ['전체 평가 개요', summary.evaluationOverview],
-    ['평가 항목', summary.evaluationItems.map(formatProjectEvaluationItem).join('\n\n')],
-    ['최종 PASS 기준', summary.finalPassCriteria.join('\n')],
-    ['동료평가 질문', summary.peerReviewQuestions.join('\n')],
-    ['AI 교관 검토 질문', summary.aiTutorReviewQuestions.join('\n')],
-    ['개선 질문', summary.improvementQuestions.join('\n')],
+    header,
+    ...missions.map((mission) => header.map((key) => toCell(mission[key as keyof Mission]))),
   ]
 }
 
-function buildReferenceRows(references: PblReferences) {
+function buildStepRows(missions: Mission[]) {
+  const header = [
+    'project_id',
+    'mission_id',
+    'step_id',
+    'step_order',
+    'section',
+    'block_type',
+    'title',
+    'learner_text',
+    'learner_action',
+    'input_type',
+    'options_ref',
+    'expected_answer_ref',
+    'expected_answer_text',
+    'is_student_visible',
+    'required_device',
+    'completion_rule',
+    'planner_note',
+    'developer_note',
+  ]
+
   return [
-    ['항목', '내용'],
-    ['추천 VOD 주제', references.recommendedVodTopics.join('\n')],
-    ['추천 데이터셋', references.recommendedDatasets.map((dataset) => `${dataset.name}: ${dataset.usage} (${dataset.note})`).join('\n')],
-    ['추천 도구', references.recommendedTools.join('\n')],
-    ['추천 읽을거리', references.recommendedReadings.join('\n')],
-    ['관련 스킬/태그', references.relatedSkills.map((skill) => `${skill.skill}: ${skill.tags.join(' ')}`).join('\n')],
-    ['검색 키워드', references.searchKeywords.join('\n')],
+    header,
+    ...missions.flatMap((mission) =>
+      mission.steps.map((step) => header.map((key) => toCell(step[key as keyof Step]))),
+    ),
   ]
 }
 
-function buildAnswerGuideRows(answerGuides: AnswerGuide[]) {
+function buildOptionRows(missions: Mission[]) {
+  const header = [
+    'project_id',
+    'mission_id',
+    'step_id',
+    'option_order',
+    'option_value',
+    'option_label',
+    'is_expected',
+    'expected_order',
+    'option_group',
+  ]
+
   return [
-    ['미션지', '구분', '항목', '내용'],
-    ...answerGuides.flatMap((guide) => [
-      [guide.sheetName, '해설 요약', guide.missionStageName, guide.guideSummary],
-      ...guide.expectedOutputs.map((output) => [
-        guide.sheetName,
-        '예시 산출물',
-        output.title,
-        [`형식: ${output.format}`, `예시: ${output.sampleContent}`, `PASS 조건: ${output.passCondition}`].join('\n'),
-      ]),
-      ...guide.stepGuides.map((step) => [
-        guide.sheetName,
-        'Step별 예상 답변',
-        `${step.step} ${step.title}`,
-        [`예상 답변: ${step.expectedResponse}`, `핵심 포인트: ${step.keyPoints.join(' / ')}`, `확인 방법: ${step.checkMethod}`].join('\n'),
-      ]),
-      ...guide.codeExamples.map((codeExample) => [
-        guide.sheetName,
-        '참고 코드',
-        codeExample.title,
-        [
-          `언어: ${codeExample.language}`,
-          `목적: ${codeExample.purpose}`,
-          `코드:\n${codeExample.code}`,
-          `예상 결과: ${codeExample.expectedResult}`,
-          `주의: ${codeExample.caution}`,
-        ].join('\n'),
-      ]),
-      ...guide.evaluationGuide.map((item) => [
-        guide.sheetName,
-        '평가 예시',
-        item.area,
-        [
-          `질문: ${item.question}`,
-          `PASS 예시: ${item.passExample}`,
-          `FAIL 예시: ${item.failExample}`,
-          `피드백 예시: ${item.feedbackExample}`,
-        ].join('\n'),
-      ]),
-      ...guide.commonMistakes.map((mistake) => [guide.sheetName, '흔한 오류', '', mistake]),
-      ...guide.reviewerNotes.map((note) => [guide.sheetName, '평가자 메모', '', note]),
-    ]),
+    header,
+    ...missions.flatMap((mission) =>
+      mission.steps.flatMap((step) =>
+        step.options.map((option) => header.map((key) => toCell(option[key as keyof StepOption]))),
+      ),
+    ),
   ]
 }
 
-function formatStep(step: MissionSheet['fiveStepGuide'][number]) {
-  return `${step.step}. ${step.title}
-설명: ${step.description}
-수행 행동: ${step.actions.join(' / ')}
-산출물: ${step.output}
-체크포인트: ${step.checkPoint}
-추천 도구: ${step.recommendedTools.join(', ')}
-예상 시간: ${step.estimatedTime}`
-}
+function buildSubmissionRows(missions: Mission[]) {
+  const header = [
+    'project_id',
+    'mission_id',
+    'submission_id',
+    'submission_title',
+    'student_instruction',
+    'evaluation_text',
+    'pass_criteria',
+    'needs_revision_example',
+    'peer_review_required',
+    'peer_review_mode',
+    'developer_note',
+  ]
 
-function formatSubmission(submission: MissionSheet['submissions'][number]) {
-  return `${submission.title} (${submission.format})
-상세 항목: ${submission.detailList.join(' / ')}
-PASS 조건: ${submission.passCondition}`
-}
-
-function formatEvaluationCriterion(criterion: MissionSheet['evaluationCriteria'][number]) {
-  return `${criterion.area} ${criterion.weight}
-질문: ${criterion.question}
-PASS 기준: ${criterion.passCriteria.join(' / ')}
-결과 옵션: ${criterion.resultOptions.join(', ')}`
-}
-
-function formatProjectEvaluationItem(item: ProjectEvaluationSummary['evaluationItems'][number]) {
-  return `${item.area}
-질문: ${item.question}
-PASS 기준: ${item.passCriteria.join(' / ')}
-확인 자료: ${item.evidence}
-결과 옵션: ${item.resultOptions.join(', ')}`
-}
-
-function formatAiUsageGuide(guide: MissionSheet['aiUsageGuide']) {
   return [
-    `허용되는 AI 활용\n${guide.allowedUses.map((item) => `- ${item.title}: ${item.examplePrompt}`).join('\n')}`,
-    `금지되는 AI 활용\n${guide.prohibitedUses.map((item) => `- ${item.title}: ${item.examplePrompt}`).join('\n')}`,
-    `AI 활용 원칙\n${guide.principles.map((item) => `- ${item}`).join('\n')}`,
-  ].join('\n\n')
+    header,
+    ...missions.map((mission) => header.map((key) => toCell(mission.submission[key as keyof Submission]))),
+  ]
+}
+
+function buildUiBlockRows(uiBlocks: UiBlockDictionaryItem[]) {
+  const header = [
+    'ui_block_type',
+    'content_unit',
+    'purpose',
+    'screen_elements',
+    'learner_action',
+    'data_to_store',
+    'student_visibility',
+    'developer_note',
+  ]
+
+  return [
+    header,
+    ...uiBlocks.map((item) => header.map((key) => toCell(item[key as keyof UiBlockDictionaryItem]))),
+  ]
+}
+
+function buildEnvironmentTagRows(tags: EnvironmentTag[]) {
+  const header = ['tag_id', 'tag_label', 'description', 'ui_usage']
+
+  return [
+    header,
+    ...tags.map((item) => header.map((key) => toCell(item[key as keyof EnvironmentTag]))),
+  ]
+}
+
+function buildValidationChecklistRows(items: ValidationChecklistItem[]) {
+  const header = ['check_id', 'category', 'check_item', 'planner_criteria', 'developer_criteria', 'status']
+
+  return [
+    header,
+    ...items.map((item) => header.map((key) => toCell(item[key as keyof ValidationChecklistItem]))),
+  ]
+}
+
+function buildExportMapRows() {
+  return [
+    ['json_path', 'sheet_name', 'primary_key', 'json_shape'],
+    ['project', '01_project', 'project_id', 'object'],
+    ['missions[]', '02_missions', 'project_id + mission_id', 'array'],
+    ['missions[].steps[]', '03_steps', 'mission_id + step_id', 'array'],
+    ['missions[].steps[].options[]', '04_options', 'step_id', 'array'],
+    ['missions[].submission', '05_submissions', 'mission_id', 'object'],
+    ['ui_blocks[]', '06_ui_block_dictionary', 'ui_block_type', 'array'],
+    ['environment_tags[]', '07_environment_tags', 'tag_id', 'array'],
+    ['validation_checklist[]', '08_validation_checklist', 'check_id', 'array'],
+  ]
+}
+
+function buildJsonPreviewRows(plan: PblPlan) {
+  return [
+    ['section_key', 'json_text'],
+    ['project', stringifyPreview(plan.project)],
+    ['environment_tags', stringifyPreview(plan.environment_tags)],
+    ...plan.missions.map((mission) => [`mission_${mission.mission_id}`, stringifyPreview(mission)]),
+    ['ui_blocks', stringifyPreview(plan.ui_blocks)],
+    ['validation_checklist', stringifyPreview(plan.validation_checklist)],
+  ]
+}
+
+function stringifyPreview(value: unknown) {
+  return JSON.stringify(value, null, 2)
+}
+
+function toCell(value: unknown): string {
+  if (value === null || value === undefined) return ''
+  if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE'
+  if (typeof value === 'number') return String(value)
+  if (Array.isArray(value)) return value.map(toCell).join('\n')
+  if (typeof value === 'object') return JSON.stringify(value)
+  return String(value)
 }

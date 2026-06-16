@@ -105,7 +105,7 @@ export function PblGenerator({ techItems, isTechItemsLoading }: PblGeneratorProp
         {plan && (
           <PblPlanResult
             plan={plan}
-            subjectName={subjectName.trim() || plan.subjectName}
+            subjectName={subjectName.trim() || plan.project.title}
             techItems={techItems}
             historyCount={planHistory.length}
             onPlanUpdated={handlePlanUpdated}

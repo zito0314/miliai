@@ -672,6 +672,139 @@
   margin-bottom: 12px;
 }
 
+.json-mission-list,
+.json-step-list,
+.json-checklist-list {
+  display: grid;
+  gap: 14px;
+}
+
+.json-mission-card,
+.json-step-card,
+.json-submission-card,
+.json-checklist-card {
+  min-width: 0;
+  border: 1px solid #d9e3df;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.json-mission-card {
+  padding: 18px;
+}
+
+.json-step-card,
+.json-submission-card,
+.json-checklist-card {
+  padding: 14px;
+}
+
+.json-mission-card-heading,
+.json-step-card-heading,
+.json-checklist-card {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.json-mission-card-heading span,
+.json-step-card-heading span,
+.json-checklist-card span,
+.json-option-list strong {
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.json-mission-card-heading h3,
+.json-step-card-heading h4 {
+  margin: 4px 0 0;
+  color: #17211f;
+  font-size: 17px;
+}
+
+.json-step-card-heading h4 {
+  font-size: 14px;
+}
+
+.json-mission-card-heading p,
+.json-checklist-card p {
+  margin: 7px 0 0;
+  color: #586762;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.json-card-actions {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.json-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.json-detail-grid > div {
+  min-width: 0;
+  border: 1px solid #e5ebe8;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #f8faf9;
+}
+
+.json-detail-grid dt {
+  color: #687772;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.json-detail-grid dd {
+  margin: 5px 0 0;
+  color: #273631;
+  font-size: 12px;
+  line-height: 1.6;
+  word-break: keep-all;
+}
+
+.json-step-tags,
+.json-option-list > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.json-step-tags .ant-tag,
+.json-option-list .ant-tag,
+.json-checklist-card .ant-tag {
+  margin: 0;
+  border-color: #cfddd8;
+  border-radius: 999px;
+  background: #edf4f2;
+  color: #3f5f56;
+}
+
+.json-option-list {
+  border-top: 1px solid #e5ebe8;
+  margin-top: 12px;
+  padding-top: 12px;
+}
+
+.json-checklist-card strong {
+  display: block;
+  margin-top: 4px;
+  color: #17211f;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
 .pbl-hierarchy {
   display: grid;
   gap: 18px;
@@ -1521,7 +1654,10 @@ mark {
   .pbl-feedback-heading,
   .answer-guide-actions,
   .workbook-section-toolbar,
-  .inline-refine-item {
+  .inline-refine-item,
+  .json-mission-card-heading,
+  .json-step-card-heading,
+  .json-checklist-card {
     align-items: stretch;
     flex-direction: column;
   }
@@ -1533,8 +1669,17 @@ mark {
   .pbl-feedback-form .ant-btn,
   .answer-guide-actions .ant-btn,
   .workbook-section-toolbar .ant-btn,
-  .inline-refine-item .ant-btn {
+  .inline-refine-item .ant-btn,
+  .json-card-actions .ant-btn {
     width: 100%;
+  }
+
+  .json-card-actions {
+    width: 100%;
+  }
+
+  .json-detail-grid {
+    grid-template-columns: 1fr;
   }
 
   .answer-guide-panel.is-empty {
