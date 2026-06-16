@@ -52,7 +52,7 @@ const aiUsageExampleSchema = z.object({
   examplePrompt: z.string(),
 })
 
-const missionSheetSchema = z.object({
+export const missionSheetSchema = z.object({
   sheetName: z.string(),
   missionStageName: z.string(),
   duration: z.string(),
@@ -80,7 +80,7 @@ const projectEvaluationItemSchema = z.object({
   resultOptions: z.array(passFailSchema).min(2).max(2),
 })
 
-const projectEvaluationSummarySchema = z.object({
+export const projectEvaluationSummarySchema = z.object({
   evaluationOverview: z.string(),
   evaluationItems: z.array(projectEvaluationItemSchema).min(6).max(10),
   finalPassCriteria: z.array(z.string()).min(4),
@@ -100,7 +100,7 @@ const relatedSkillSchema = z.object({
   tags: z.array(z.string()).min(1),
 })
 
-const referencesSchema = z.object({
+export const referencesSchema = z.object({
   recommendedVodTopics: z.array(z.string()).min(5).max(10),
   recommendedDatasets: z.array(datasetReferenceSchema).min(2),
   recommendedTools: z.array(z.string()).min(3),
@@ -114,27 +114,29 @@ const workbookSheetSchema = z.object({
   rows: z.array(z.array(z.string()).min(1)).min(2),
 })
 
-const pblPlanSchema = z.object({
+export const projectOverviewSchema = z.object({
+  projectTitle: z.string(),
+  totalDuration: z.string(),
+  teamComposition: z.string(),
+  difficultyLevelNumber: z.number().min(1).max(10),
+  difficultyLevelLabel: difficultyLevelLabelSchema,
+  difficultyDescription: z.string(),
+  difficultyReason: z.string(),
+  difficultyReviewNote: z.string(),
+  projectGoal: z.string(),
+  finalOutput: z.string(),
+  constraints: z.string(),
+  evaluationCriteria: z.string(),
+  subMissionList: z.array(z.string()).min(2).max(4),
+})
+
+export const pblPlanSchema = z.object({
   courseName: z.string(),
   curriculumName: z.string(),
   subjectName: z.string(),
   missionSheetCount: z.number().min(2).max(4),
   missionSheetCountReason: z.string(),
-  projectOverview: z.object({
-    projectTitle: z.string(),
-    totalDuration: z.string(),
-    teamComposition: z.string(),
-    difficultyLevelNumber: z.number().min(1).max(10),
-    difficultyLevelLabel: difficultyLevelLabelSchema,
-    difficultyDescription: z.string(),
-    difficultyReason: z.string(),
-    difficultyReviewNote: z.string(),
-    projectGoal: z.string(),
-    finalOutput: z.string(),
-    constraints: z.string(),
-    evaluationCriteria: z.string(),
-    subMissionList: z.array(z.string()).min(2).max(4),
-  }),
+  projectOverview: projectOverviewSchema,
   missionSheets: z.array(missionSheetSchema).min(2).max(4),
   projectEvaluationSummary: projectEvaluationSummarySchema,
   references: referencesSchema,
@@ -206,7 +208,7 @@ export default async function handler(request, response) {
   }
 }
 
-function validatePlanConsistency(plan) {
+export function validatePlanConsistency(plan) {
   if (plan.missionSheetCount !== plan.missionSheets.length) {
     throw new Error('missionSheetCount와 missionSheets 길이가 일치하지 않습니다.')
   }
@@ -240,7 +242,7 @@ function validatePlanConsistency(plan) {
   }
 }
 
-function normalizeGeneratedPlan(generatedPlan, fallbackSubjectName) {
+export function normalizeGeneratedPlan(generatedPlan, fallbackSubjectName) {
   const rawPlan = asObject(generatedPlan)
   const subjectName = asString(rawPlan.subjectName, fallbackSubjectName)
   const courseName = asString(rawPlan.courseName, `${subjectName} AI 활용 과정`)
@@ -580,7 +582,7 @@ function normalizeRelatedSkills(value) {
   }))
 }
 
-function buildExcelWorkbook(plan) {
+export function buildExcelWorkbook(plan) {
   return {
     sheets: [
       { sheetName: '프로젝트개요', rows: buildProjectOverviewRows(plan) },
@@ -773,7 +775,7 @@ function asString(value, fallback) {
   return typeof value === 'string' && value.trim() ? value.trim() : fallback
 }
 
-function safeJsonParse(value) {
+export function safeJsonParse(value) {
   try {
     return JSON.parse(value)
   } catch {
@@ -781,7 +783,7 @@ function safeJsonParse(value) {
   }
 }
 
-function simplifyGeminiSchema(value) {
+export function simplifyGeminiSchema(value) {
   if (Array.isArray(value)) {
     value.forEach(simplifyGeminiSchema)
     return

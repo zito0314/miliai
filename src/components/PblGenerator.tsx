@@ -14,6 +14,7 @@ type PblGeneratorProps = {
 export function PblGenerator({ techItems, isTechItemsLoading }: PblGeneratorProps) {
   const [subjectName, setSubjectName] = useState('')
   const [plan, setPlan] = useState<PblPlan | null>(null)
+  const [planHistory, setPlanHistory] = useState<PblPlan[]>([])
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -28,6 +29,7 @@ export function PblGenerator({ techItems, isTechItemsLoading }: PblGeneratorProp
     setError(null)
     try {
       setPlan(await generatePblPlan(trimmedSubject, techItems))
+      setPlanHistory([])
     } catch (generationError) {
       setError(
         generationError instanceof Error
@@ -40,6 +42,25 @@ export function PblGenerator({ techItems, isTechItemsLoading }: PblGeneratorProp
   }
 
   const unavailable = isTechItemsLoading || techItems.length === 0
+
+  const handlePlanUpdated = (updatedPlan: PblPlan) => {
+    setPlan((currentPlan) => {
+      if (!currentPlan) return updatedPlan
+      setPlanHistory((currentHistory) => [...currentHistory, currentPlan])
+      return updatedPlan
+    })
+  }
+
+  const handleUndo = () => {
+    setPlanHistory((currentHistory) => {
+      const previousPlan = currentHistory.at(-1)
+      if (previousPlan) {
+        setPlan(previousPlan)
+        return currentHistory.slice(0, -1)
+      }
+      return currentHistory
+    })
+  }
 
   return (
     <section className="pbl-generator-section">
@@ -82,7 +103,16 @@ export function PblGenerator({ techItems, isTechItemsLoading }: PblGeneratorProp
         {unavailable && <p className="pbl-generator-help">기술 데이터를 불러온 뒤 생성할 수 있어요.</p>}
         {error && <Alert className="pbl-generator-error" type="error" showIcon title={error} />}
 
-        {plan && <PblPlanResult plan={plan} />}
+        {plan && (
+          <PblPlanResult
+            plan={plan}
+            subjectName={subjectName.trim() || plan.subjectName}
+            techItems={techItems}
+            historyCount={planHistory.length}
+            onPlanUpdated={handlePlanUpdated}
+            onUndo={handleUndo}
+          />
+        )}
       </div>
     </section>
   )

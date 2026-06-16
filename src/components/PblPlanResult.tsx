@@ -2,17 +2,54 @@ import { useMemo, useState } from 'react'
 import { CopyOutlined, DownloadOutlined } from '@ant-design/icons'
 import { Alert, Button, Tabs, Tag, message } from 'antd'
 import type { ExcelWorkbookSheet, PblPlan } from '../types/pbl'
+import type { RefineTargetType } from '../types/refine'
+import type { TechItem } from '../types/tech'
 import { copyWorkbookAsTsv, copyWorkbookSheetAsTsv } from '../utils/copyPblPlanAsTsv'
 import { downloadJson } from '../utils/downloadJson'
+import { getByPath } from '../utils/getByPath'
+import { InlineTextRefiner } from './InlineTextRefiner'
+import { PblFeedbackPanel } from './PblFeedbackPanel'
 import { PblPlanTable } from './PblPlanTable'
+import { RefineResultNotice } from './RefineResultNotice'
+import { SectionRefineButton } from './SectionRefineButton'
 
-export function PblPlanResult({ plan }: { plan: PblPlan }) {
+type PblPlanResultProps = {
+  plan: PblPlan
+  subjectName: string
+  techItems: TechItem[]
+  historyCount: number
+  onPlanUpdated: (plan: PblPlan) => void
+  onUndo: () => void
+}
+
+type SectionTarget = {
+  targetPath: string
+  targetType: RefineTargetType
+  targetData: unknown
+  label: string
+}
+
+type TextRefineTarget = {
+  label: string
+  path: string
+  text: string
+}
+
+export function PblPlanResult({ plan, subjectName, techItems, historyCount, onPlanUpdated, onUndo }: PblPlanResultProps) {
   const [activeSheetName, setActiveSheetName] = useState(plan.excelWorkbook.sheets[0]?.sheetName || '')
+  const [lastChangeSummary, setLastChangeSummary] = useState<string | null>(null)
   const [messageApi, contextHolder] = message.useMessage()
   const activeSheet = useMemo(
     () => plan.excelWorkbook.sheets.find((sheet) => sheet.sheetName === activeSheetName) || plan.excelWorkbook.sheets[0],
     [activeSheetName, plan.excelWorkbook.sheets],
   )
+  const activeTabKey = activeSheet?.sheetName || ''
+
+  const handlePlanUpdated = (updatedPlan: PblPlan, changeSummary?: string) => {
+    onPlanUpdated(updatedPlan)
+    setLastChangeSummary(changeSummary || '수정 요청을 반영해 PBL 계획을 업데이트했습니다.')
+    messageApi.success('피드백을 반영했어요.')
+  }
 
   const handleCopySheet = async (sheet: ExcelWorkbookSheet | undefined) => {
     if (!sheet) return
@@ -53,6 +90,20 @@ export function PblPlanResult({ plan }: { plan: PblPlan }) {
           </Button>
         </div>
       </div>
+
+      <PblFeedbackPanel
+        plan={plan}
+        subjectName={subjectName}
+        techItems={techItems}
+        historyCount={historyCount}
+        onUpdated={handlePlanUpdated}
+        onUndo={() => {
+          onUndo()
+          setLastChangeSummary('이전 버전으로 되돌렸습니다.')
+        }}
+      />
+
+      <RefineResultNotice message={lastChangeSummary} />
 
       <div className="pbl-summary workbook-summary">
         <div className="pbl-summary-main">
@@ -107,14 +158,155 @@ export function PblPlanResult({ plan }: { plan: PblPlan }) {
 
       <Tabs
         className="workbook-tabs"
-        activeKey={activeSheet?.sheetName}
+        activeKey={activeTabKey}
         onChange={setActiveSheetName}
         items={plan.excelWorkbook.sheets.map((sheet) => ({
           key: sheet.sheetName,
           label: sheet.sheetName,
-          children: <PblPlanTable sheet={sheet} />,
+          children: (
+            <WorkbookSheetPane
+              plan={plan}
+              sheet={sheet}
+              techItems={techItems}
+              onPlanUpdated={handlePlanUpdated}
+            />
+          ),
         }))}
       />
     </section>
   )
+}
+
+function WorkbookSheetPane({
+  plan,
+  sheet,
+  techItems,
+  onPlanUpdated,
+}: {
+  plan: PblPlan
+  sheet: ExcelWorkbookSheet
+  techItems: TechItem[]
+  onPlanUpdated: (plan: PblPlan, changeSummary?: string) => void
+}) {
+  const sectionTarget = getSectionTarget(plan, sheet.sheetName)
+  const textTargets = getTextRefineTargets(plan, sheet.sheetName)
+
+  return (
+    <div className="workbook-sheet-pane">
+      {sectionTarget && (
+        <div className="workbook-section-toolbar">
+          <div>
+            <span>섹션 수정</span>
+            <strong>{sectionTarget.label}</strong>
+          </div>
+          <SectionRefineButton
+            currentPlan={plan}
+            targetPath={sectionTarget.targetPath}
+            targetType={sectionTarget.targetType}
+            targetData={sectionTarget.targetData}
+            techItems={techItems}
+            onUpdated={onPlanUpdated}
+          />
+        </div>
+      )}
+
+      {textTargets.length > 0 && (
+        <div className="inline-refine-list">
+          <div className="inline-refine-list-heading">
+            <span>텍스트 블록 수정</span>
+            <p>자주 다듬는 문장만 골라 빠르게 수정할 수 있어요.</p>
+          </div>
+          {textTargets.map((target) => (
+            <div className="inline-refine-item" key={target.path}>
+              <div>
+                <span>{target.label}</span>
+                <p>{target.text}</p>
+              </div>
+              <InlineTextRefiner
+                currentPlan={plan}
+                targetPath={target.path}
+                currentText={target.text}
+                onUpdated={onPlanUpdated}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+
+      <PblPlanTable sheet={sheet} />
+    </div>
+  )
+}
+
+function getSectionTarget(plan: PblPlan, sheetName: string): SectionTarget | null {
+  if (sheetName === '프로젝트개요') {
+    return {
+      targetPath: 'projectOverview',
+      targetType: 'projectOverview',
+      targetData: plan.projectOverview,
+      label: '프로젝트개요',
+    }
+  }
+
+  const missionIndex = getMissionIndex(sheetName)
+  if (missionIndex !== null && plan.missionSheets[missionIndex]) {
+    return {
+      targetPath: `missionSheets[${missionIndex}]`,
+      targetType: 'missionSheet',
+      targetData: plan.missionSheets[missionIndex],
+      label: plan.missionSheets[missionIndex].missionStageName,
+    }
+  }
+
+  if (sheetName === '전체 프로젝트 평가 종합') {
+    return {
+      targetPath: 'projectEvaluationSummary',
+      targetType: 'projectEvaluationSummary',
+      targetData: plan.projectEvaluationSummary,
+      label: '전체 프로젝트 평가 종합',
+    }
+  }
+
+  if (sheetName === '참고자료') {
+    return {
+      targetPath: 'references',
+      targetType: 'references',
+      targetData: plan.references,
+      label: '참고자료',
+    }
+  }
+
+  return null
+}
+
+function getTextRefineTargets(plan: PblPlan, sheetName: string): TextRefineTarget[] {
+  if (sheetName === '프로젝트개요') {
+    return [
+      buildTextTarget(plan, '프로젝트 목표', 'projectOverview.projectGoal'),
+      buildTextTarget(plan, '최종 산출물', 'projectOverview.finalOutput'),
+      buildTextTarget(plan, '제약조건', 'projectOverview.constraints'),
+    ].filter(Boolean) as TextRefineTarget[]
+  }
+
+  const missionIndex = getMissionIndex(sheetName)
+  if (missionIndex !== null && plan.missionSheets[missionIndex]) {
+    return [
+      buildTextTarget(plan, '차시 개요', `missionSheets[${missionIndex}].overview`),
+      buildTextTarget(plan, '문제 상황', `missionSheets[${missionIndex}].pblProblem.problemSituation`),
+      buildTextTarget(plan, '미션 문장', `missionSheets[${missionIndex}].missionStatement`),
+    ].filter(Boolean) as TextRefineTarget[]
+  }
+
+  return []
+}
+
+function buildTextTarget(plan: PblPlan, label: string, path: string): TextRefineTarget | null {
+  const text = getByPath(plan, path)
+  return typeof text === 'string' && text.trim() ? { label, path, text } : null
+}
+
+function getMissionIndex(sheetName: string) {
+  const match = /^미션지_(\d+)$/.exec(sheetName)
+  if (!match) return null
+  return Number(match[1]) - 1
 }
