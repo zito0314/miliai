@@ -168,7 +168,7 @@ export default async function handler(request, response) {
 
   try {
     const ai = new GoogleGenAI({ apiKey })
-    const model = process.env.GEMINI_MODEL?.trim() || 'gemini-flash-latest'
+    const model = process.env.GEMINI_MODEL?.trim() || 'gemini-2.5-flash'
     const result = await ai.models.generateContent({
       model,
       contents: buildPrompt(subjectName.slice(0, 200), techContext),

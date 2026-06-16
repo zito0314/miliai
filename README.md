@@ -38,7 +38,7 @@ Gemini 기반 PBL 과정 자동 생성 기능까지 로컬에서 실행할 때:
 
 ```bash
 GEMINI_API_KEY=발급받은_API_키
-GEMINI_MODEL=gemini-flash-latest
+GEMINI_MODEL=gemini-2.5-flash
 ```
 
 ```bash
