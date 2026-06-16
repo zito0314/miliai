@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BulbOutlined, ThunderboltOutlined } from '@ant-design/icons'
+import { ThunderboltOutlined } from '@ant-design/icons'
 import { Alert, Button, Input } from 'antd'
 import type { PblPlan } from '../types/pbl'
 import type { TechItem } from '../types/tech'
@@ -66,7 +66,6 @@ export function PblGenerator({ techItems, isTechItemsLoading }: PblGeneratorProp
     <section className="pbl-generator-section">
       <div className="pbl-generator-inner">
         <div className="pbl-generator-heading">
-          <span className="pbl-generator-icon" aria-hidden="true"><BulbOutlined /></span>
           <div>
             <span>AI 과정설계 도구</span>
             <h2>PBL 과정 자동 생성</h2>

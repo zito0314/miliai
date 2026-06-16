@@ -82,7 +82,7 @@
 
 .data-status-section {
   border-bottom: 1px solid var(--line);
-  background: #ffffff;
+  background: #f4f6f5;
 }
 
 .data-status-inner,
@@ -157,21 +157,7 @@
 }
 
 .pbl-generator-heading {
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-}
-
-.pbl-generator-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 8px;
-  display: grid;
-  place-items: center;
-  flex: 0 0 auto;
-  background: #e5efec;
-  color: var(--green);
-  font-size: 20px;
+  text-align: center;
 }
 
 .pbl-generator-heading > div > span,
