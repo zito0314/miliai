@@ -13,6 +13,9 @@ export function normalizePblPlan(plan: PblPlan): PblPlan {
     ...plan,
     missionSheetCount,
     missionSheets: normalizedMissionSheets,
+    answerGuides: plan.answerGuides?.filter((guide) =>
+      normalizedMissionSheets.some((sheet) => sheet.sheetName === guide.sheetName),
+    ),
     projectOverview: {
       ...plan.projectOverview,
       subMissionList: plan.projectOverview.subMissionList.slice(0, missionSheetCount),

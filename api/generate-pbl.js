@@ -114,6 +114,50 @@ const workbookSheetSchema = z.object({
   rows: z.array(z.array(z.string()).min(1)).min(2),
 })
 
+export const expectedOutputSchema = z.object({
+  title: z.string(),
+  format: z.string(),
+  sampleContent: z.string(),
+  passCondition: z.string(),
+})
+
+export const stepAnswerGuideSchema = z.object({
+  step: z.string(),
+  title: z.string(),
+  expectedResponse: z.string(),
+  keyPoints: z.array(z.string()),
+  checkMethod: z.string(),
+})
+
+export const codeExampleSchema = z.object({
+  title: z.string(),
+  language: z.string(),
+  purpose: z.string(),
+  code: z.string(),
+  expectedResult: z.string(),
+  caution: z.string(),
+})
+
+export const evaluationGuideItemSchema = z.object({
+  area: z.string(),
+  question: z.string(),
+  passExample: z.string(),
+  failExample: z.string(),
+  feedbackExample: z.string(),
+})
+
+export const answerGuideSchema = z.object({
+  sheetName: z.string(),
+  missionStageName: z.string(),
+  guideSummary: z.string(),
+  expectedOutputs: z.array(expectedOutputSchema),
+  stepGuides: z.array(stepAnswerGuideSchema),
+  codeExamples: z.array(codeExampleSchema).default([]),
+  evaluationGuide: z.array(evaluationGuideItemSchema),
+  commonMistakes: z.array(z.string()),
+  reviewerNotes: z.array(z.string()),
+})
+
 export const projectOverviewSchema = z.object({
   projectTitle: z.string(),
   totalDuration: z.string(),
@@ -143,8 +187,9 @@ export const pblContentSchema = z.object({
 })
 
 export const pblPlanSchema = pblContentSchema.extend({
+  answerGuides: z.array(answerGuideSchema).optional(),
   excelWorkbook: z.object({
-    sheets: z.array(workbookSheetSchema).min(5).max(7),
+    sheets: z.array(workbookSheetSchema).min(5).max(8),
   }),
 })
 
@@ -221,6 +266,7 @@ export function validatePlanConsistency(plan) {
     ...plan.missionSheets.map((sheet) => sheet.sheetName),
     '전체 프로젝트 평가 종합',
     '참고자료',
+    ...(plan.answerGuides?.length ? ['기획자용 예상 답안'] : []),
   ]
   const workbookSheetNames = plan.excelWorkbook.sheets.map((sheet) => sheet.sheetName)
 
@@ -269,6 +315,7 @@ export function normalizePblPlan(generatedPlan, fallbackSubjectName) {
   })
   const projectEvaluationSummary = normalizeProjectEvaluationSummary(rawPlan.projectEvaluationSummary, subjectName)
   const references = normalizeReferences(rawPlan.references, missionSheets)
+  const answerGuides = normalizeAnswerGuides(rawPlan.answerGuides, missionSheets)
 
   return {
     courseName,
@@ -280,6 +327,7 @@ export function normalizePblPlan(generatedPlan, fallbackSubjectName) {
     missionSheets,
     projectEvaluationSummary,
     references,
+    ...(answerGuides.length ? { answerGuides } : {}),
   }
 }
 
@@ -592,13 +640,76 @@ function normalizeRelatedSkills(value) {
   }))
 }
 
+function normalizeAnswerGuides(value, missionSheets) {
+  const missionSheetNames = new Set(missionSheets.map((sheet) => sheet.sheetName))
+
+  return asArray(value)
+    .map((guide) => normalizeAnswerGuide(guide))
+    .filter((guide) => missionSheetNames.has(guide.sheetName))
+}
+
+function normalizeAnswerGuide(value) {
+  const rawGuide = asObject(value)
+  const sheetName = asString(rawGuide.sheetName, '')
+
+  return {
+    sheetName,
+    missionStageName: asString(rawGuide.missionStageName, sheetName),
+    guideSummary: asString(rawGuide.guideSummary, '기획자가 미션 산출물과 평가 기준을 검토하기 위한 예상 답안 가이드입니다.'),
+    expectedOutputs: normalizeObjectArray(rawGuide.expectedOutputs, [
+      { title: '예시 산출물', format: '문서 또는 표', sampleContent: '미션 요구사항에 맞는 예시 산출물 내용', passCondition: '평가자가 확인 가능한 근거와 기준이 포함되어야 한다.' },
+    ], 1, 8, (item, fallbackItem) => ({
+      title: asString(item.title, fallbackItem.title),
+      format: asString(item.format, fallbackItem.format),
+      sampleContent: asString(item.sampleContent, fallbackItem.sampleContent),
+      passCondition: asString(item.passCondition, fallbackItem.passCondition),
+    })),
+    stepGuides: normalizeObjectArray(rawGuide.stepGuides, [
+      { step: 'Step 1', title: '예상 답변', expectedResponse: '학습자가 작성할 수 있는 예상 답변 예시', keyPoints: ['핵심 근거'], checkMethod: '제출물에서 핵심 근거를 확인한다.' },
+    ], 1, 8, (item, fallbackItem) => ({
+      step: asString(item.step, fallbackItem.step),
+      title: asString(item.title, fallbackItem.title),
+      expectedResponse: asString(item.expectedResponse, fallbackItem.expectedResponse),
+      keyPoints: normalizeStringArray(item.keyPoints, fallbackItem.keyPoints, 1, 6),
+      checkMethod: asString(item.checkMethod, fallbackItem.checkMethod),
+    })),
+    codeExamples: asArray(rawGuide.codeExamples).slice(0, 6).map((item) => {
+      const rawItem = asObject(item)
+      return {
+        title: asString(rawItem.title, '참고 코드'),
+        language: asString(rawItem.language, 'text'),
+        purpose: asString(rawItem.purpose, '학습자가 풀이 방향을 이해하기 위한 참고 코드'),
+        code: asString(rawItem.code, ''),
+        expectedResult: asString(rawItem.expectedResult, '실행 결과를 확인한다.'),
+        caution: asString(rawItem.caution, '학습 환경에 맞게 입력값과 파일명을 수정해야 한다.'),
+      }
+    }).filter((item) => item.code),
+    evaluationGuide: normalizeObjectArray(rawGuide.evaluationGuide, [
+      { area: '완성도 평가', question: '미션 산출물이 요구사항을 충족하는가?', passExample: '판단 근거가 구체적으로 제시되어 있다.', failExample: '추상적인 설명만 있고 확인 가능한 근거가 없다.', feedbackExample: '판단 가능한 근거와 제출물 예시를 보완해보세요.' },
+    ], 1, 8, (item, fallbackItem) => ({
+      area: asString(item.area, fallbackItem.area),
+      question: asString(item.question, fallbackItem.question),
+      passExample: asString(item.passExample, fallbackItem.passExample),
+      failExample: asString(item.failExample, fallbackItem.failExample),
+      feedbackExample: asString(item.feedbackExample, fallbackItem.feedbackExample),
+    })),
+    commonMistakes: normalizeStringArray(rawGuide.commonMistakes, ['문제 상황이나 판단 기준을 너무 추상적으로 작성함'], 1, 8),
+    reviewerNotes: normalizeStringArray(rawGuide.reviewerNotes, ['정답 여부보다 산출물의 근거와 평가 가능성을 중심으로 검토한다.'], 1, 8),
+  }
+}
+
 export function buildExcelWorkbook(plan) {
+  const answerGuideSheets = plan.answerGuides?.length
+    ? [{ sheetName: '기획자용 예상 답안', rows: buildAnswerGuideRows(plan.answerGuides) }]
+    : []
+
   return {
     sheets: [
       { sheetName: '프로젝트개요', rows: buildProjectOverviewRows(plan) },
       ...plan.missionSheets.map((sheet) => ({ sheetName: sheet.sheetName, rows: buildMissionSheetRows(sheet) })),
       { sheetName: '전체 프로젝트 평가 종합', rows: buildProjectEvaluationRows(plan.projectEvaluationSummary) },
       { sheetName: '참고자료', rows: buildReferenceRows(plan.references) },
+      ...answerGuideSheets,
     ],
   }
 }
@@ -663,6 +774,52 @@ function buildReferenceRows(references) {
     ['추천 읽을거리', references.recommendedReadings.join('\n')],
     ['관련 스킬/태그', references.relatedSkills.map((skill) => `${skill.skill}: ${skill.tags.join(' ')}`).join('\n')],
     ['검색 키워드', references.searchKeywords.join('\n')],
+  ]
+}
+
+function buildAnswerGuideRows(answerGuides) {
+  return [
+    ['미션지', '구분', '항목', '내용'],
+    ...answerGuides.flatMap((guide) => [
+      [guide.sheetName, '해설 요약', guide.missionStageName, guide.guideSummary],
+      ...guide.expectedOutputs.map((output) => [
+        guide.sheetName,
+        '예시 산출물',
+        output.title,
+        [`형식: ${output.format}`, `예시: ${output.sampleContent}`, `PASS 조건: ${output.passCondition}`].join('\n'),
+      ]),
+      ...guide.stepGuides.map((step) => [
+        guide.sheetName,
+        'Step별 예상 답변',
+        `${step.step} ${step.title}`,
+        [`예상 답변: ${step.expectedResponse}`, `핵심 포인트: ${step.keyPoints.join(' / ')}`, `확인 방법: ${step.checkMethod}`].join('\n'),
+      ]),
+      ...guide.codeExamples.map((codeExample) => [
+        guide.sheetName,
+        '참고 코드',
+        codeExample.title,
+        [
+          `언어: ${codeExample.language}`,
+          `목적: ${codeExample.purpose}`,
+          `코드:\n${codeExample.code}`,
+          `예상 결과: ${codeExample.expectedResult}`,
+          `주의: ${codeExample.caution}`,
+        ].join('\n'),
+      ]),
+      ...guide.evaluationGuide.map((item) => [
+        guide.sheetName,
+        '평가 예시',
+        item.area,
+        [
+          `질문: ${item.question}`,
+          `PASS 예시: ${item.passExample}`,
+          `FAIL 예시: ${item.failExample}`,
+          `피드백 예시: ${item.feedbackExample}`,
+        ].join('\n'),
+      ]),
+      ...guide.commonMistakes.map((mistake) => [guide.sheetName, '흔한 오류', '', mistake]),
+      ...guide.reviewerNotes.map((note) => [guide.sheetName, '평가자 메모', '', note]),
+    ]),
   ]
 }
 
@@ -825,6 +982,7 @@ export function simplifyGeminiSchema(value) {
   delete value.additionalProperties
   delete value.minItems
   delete value.maxItems
+  delete value.default
   Object.values(value).forEach(simplifyGeminiSchema)
 }
 

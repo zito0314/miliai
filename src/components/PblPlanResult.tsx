@@ -1,12 +1,14 @@
 import { useMemo, useState } from 'react'
-import { CopyOutlined, DownloadOutlined } from '@ant-design/icons'
+import { CopyOutlined, DownloadOutlined, FileTextOutlined } from '@ant-design/icons'
 import { Alert, Button, Tabs, Tag, message } from 'antd'
 import type { ExcelWorkbookSheet, PblPlan } from '../types/pbl'
 import type { RefineTargetType } from '../types/refine'
 import type { TechItem } from '../types/tech'
+import { generateAnswerGuide } from '../services/generateAnswerGuide'
 import { copyWorkbookAsTsv, copyWorkbookSheetAsTsv } from '../utils/copyPblPlanAsTsv'
 import { downloadJson } from '../utils/downloadJson'
 import { getByPath } from '../utils/getByPath'
+import { AnswerGuidePanel } from './AnswerGuidePanel'
 import { InlineTextRefiner } from './InlineTextRefiner'
 import { PblFeedbackPanel } from './PblFeedbackPanel'
 import { PblPlanTable } from './PblPlanTable'
@@ -38,6 +40,8 @@ type TextRefineTarget = {
 export function PblPlanResult({ plan, subjectName, techItems, historyCount, onPlanUpdated, onUndo }: PblPlanResultProps) {
   const [activeSheetName, setActiveSheetName] = useState(plan.excelWorkbook.sheets[0]?.sheetName || '')
   const [lastChangeSummary, setLastChangeSummary] = useState<string | null>(null)
+  const [answerGuideError, setAnswerGuideError] = useState<string | null>(null)
+  const [answerGuideGeneratingTarget, setAnswerGuideGeneratingTarget] = useState<'all' | number | null>(null)
   const [messageApi, contextHolder] = message.useMessage()
   const activeSheet = useMemo(
     () => plan.excelWorkbook.sheets.find((sheet) => sheet.sheetName === activeSheetName) || plan.excelWorkbook.sheets[0],
@@ -48,7 +52,32 @@ export function PblPlanResult({ plan, subjectName, techItems, historyCount, onPl
   const handlePlanUpdated = (updatedPlan: PblPlan, changeSummary?: string) => {
     onPlanUpdated(updatedPlan)
     setLastChangeSummary(changeSummary || '수정 요청을 반영해 PBL 계획을 업데이트했습니다.')
+    if (changeSummary?.includes('예상 답안이 초기화')) {
+      setAnswerGuideError(null)
+    }
     messageApi.success('피드백을 반영했어요.')
+  }
+
+  const handleGenerateAnswerGuide = async (targetMissionSheetIndex?: number) => {
+    const nextTarget = targetMissionSheetIndex === undefined ? 'all' : targetMissionSheetIndex
+    setAnswerGuideGeneratingTarget(nextTarget)
+    setAnswerGuideError(null)
+
+    try {
+      const result = await generateAnswerGuide({
+        currentPlan: plan,
+        techItems,
+        targetMissionSheetIndex,
+      })
+      onPlanUpdated(result.updatedPlan)
+      const successMessage = targetMissionSheetIndex === undefined ? '예상 답안을 생성했어요.' : '이 미션지의 예상 답안을 생성했어요.'
+      setLastChangeSummary(successMessage)
+      messageApi.success(successMessage)
+    } catch {
+      setAnswerGuideError('예상 답안 생성 중 오류가 발생했어요.')
+    } finally {
+      setAnswerGuideGeneratingTarget(null)
+    }
   }
 
   const handleCopySheet = async (sheet: ExcelWorkbookSheet | undefined) => {
@@ -103,6 +132,25 @@ export function PblPlanResult({ plan, subjectName, techItems, historyCount, onPl
         }}
       />
 
+      <section className="answer-guide-actions" aria-label="예상 답안 생성">
+        <div>
+          <span>기획자용 예상 답안</span>
+          <h3>예상 답안 생성</h3>
+          <p>미션지별 예상 답변, 예시 산출물, 참고 코드, 평가 기준을 생성합니다.</p>
+        </div>
+        <Button
+          type="primary"
+          icon={<FileTextOutlined />}
+          loading={answerGuideGeneratingTarget === 'all'}
+          disabled={answerGuideGeneratingTarget !== null}
+          onClick={() => void handleGenerateAnswerGuide()}
+        >
+          {answerGuideGeneratingTarget === 'all' ? '예상 답안을 생성하는 중이에요.' : '예상 답안 생성'}
+        </Button>
+      </section>
+
+      {answerGuideError && <Alert className="refine-error-alert" type="error" showIcon message={answerGuideError} />}
+
       <RefineResultNotice message={lastChangeSummary} />
 
       <div className="pbl-summary workbook-summary">
@@ -156,6 +204,8 @@ export function PblPlanResult({ plan, subjectName, techItems, historyCount, onPl
         message="AI가 생성한 기획자용 PBL 템플릿 초안입니다. 실제 교육 목표, 데이터 환경, 보안 기준에 맞게 검토·수정해주세요."
       />
 
+      <AnswerGuidePanel answerGuides={plan.answerGuides} />
+
       <Tabs
         className="workbook-tabs"
         activeKey={activeTabKey}
@@ -168,7 +218,9 @@ export function PblPlanResult({ plan, subjectName, techItems, historyCount, onPl
               plan={plan}
               sheet={sheet}
               techItems={techItems}
+              answerGuideGeneratingTarget={answerGuideGeneratingTarget}
               onPlanUpdated={handlePlanUpdated}
+              onGenerateAnswerGuide={handleGenerateAnswerGuide}
             />
           ),
         }))}
@@ -181,15 +233,20 @@ function WorkbookSheetPane({
   plan,
   sheet,
   techItems,
+  answerGuideGeneratingTarget,
   onPlanUpdated,
+  onGenerateAnswerGuide,
 }: {
   plan: PblPlan
   sheet: ExcelWorkbookSheet
   techItems: TechItem[]
+  answerGuideGeneratingTarget: 'all' | number | null
   onPlanUpdated: (plan: PblPlan, changeSummary?: string) => void
+  onGenerateAnswerGuide: (targetMissionSheetIndex?: number) => Promise<void>
 }) {
   const sectionTarget = getSectionTarget(plan, sheet.sheetName)
   const textTargets = getTextRefineTargets(plan, sheet.sheetName)
+  const missionIndex = getMissionIndex(sheet.sheetName)
 
   return (
     <div className="workbook-sheet-pane">
@@ -207,6 +264,17 @@ function WorkbookSheetPane({
             techItems={techItems}
             onUpdated={onPlanUpdated}
           />
+          {missionIndex !== null && (
+            <Button
+              size="small"
+              icon={<FileTextOutlined />}
+              loading={answerGuideGeneratingTarget === missionIndex}
+              disabled={answerGuideGeneratingTarget !== null}
+              onClick={() => void onGenerateAnswerGuide(missionIndex)}
+            >
+              이 미션지 예상 답안 생성
+            </Button>
+          )}
         </div>
       )}
 

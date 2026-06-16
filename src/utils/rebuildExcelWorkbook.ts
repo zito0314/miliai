@@ -1,12 +1,17 @@
-import type { ExcelWorkbook, MissionSheet, PblPlan, PblReferences, ProjectEvaluationSummary } from '../types/pbl'
+import type { AnswerGuide, ExcelWorkbook, MissionSheet, PblPlan, PblReferences, ProjectEvaluationSummary } from '../types/pbl'
 
 export function rebuildExcelWorkbook(plan: PblPlan): ExcelWorkbook {
+  const answerGuideSheets = plan.answerGuides?.length
+    ? [{ sheetName: '기획자용 예상 답안', rows: buildAnswerGuideRows(plan.answerGuides) }]
+    : []
+
   return {
     sheets: [
       { sheetName: '프로젝트개요', rows: buildProjectOverviewRows(plan) },
       ...plan.missionSheets.map((sheet) => ({ sheetName: sheet.sheetName, rows: buildMissionSheetRows(sheet) })),
       { sheetName: '전체 프로젝트 평가 종합', rows: buildProjectEvaluationRows(plan.projectEvaluationSummary) },
       { sheetName: '참고자료', rows: buildReferenceRows(plan.references) },
+      ...answerGuideSheets,
     ],
   }
 }
@@ -71,6 +76,52 @@ function buildReferenceRows(references: PblReferences) {
     ['추천 읽을거리', references.recommendedReadings.join('\n')],
     ['관련 스킬/태그', references.relatedSkills.map((skill) => `${skill.skill}: ${skill.tags.join(' ')}`).join('\n')],
     ['검색 키워드', references.searchKeywords.join('\n')],
+  ]
+}
+
+function buildAnswerGuideRows(answerGuides: AnswerGuide[]) {
+  return [
+    ['미션지', '구분', '항목', '내용'],
+    ...answerGuides.flatMap((guide) => [
+      [guide.sheetName, '해설 요약', guide.missionStageName, guide.guideSummary],
+      ...guide.expectedOutputs.map((output) => [
+        guide.sheetName,
+        '예시 산출물',
+        output.title,
+        [`형식: ${output.format}`, `예시: ${output.sampleContent}`, `PASS 조건: ${output.passCondition}`].join('\n'),
+      ]),
+      ...guide.stepGuides.map((step) => [
+        guide.sheetName,
+        'Step별 예상 답변',
+        `${step.step} ${step.title}`,
+        [`예상 답변: ${step.expectedResponse}`, `핵심 포인트: ${step.keyPoints.join(' / ')}`, `확인 방법: ${step.checkMethod}`].join('\n'),
+      ]),
+      ...guide.codeExamples.map((codeExample) => [
+        guide.sheetName,
+        '참고 코드',
+        codeExample.title,
+        [
+          `언어: ${codeExample.language}`,
+          `목적: ${codeExample.purpose}`,
+          `코드:\n${codeExample.code}`,
+          `예상 결과: ${codeExample.expectedResult}`,
+          `주의: ${codeExample.caution}`,
+        ].join('\n'),
+      ]),
+      ...guide.evaluationGuide.map((item) => [
+        guide.sheetName,
+        '평가 예시',
+        item.area,
+        [
+          `질문: ${item.question}`,
+          `PASS 예시: ${item.passExample}`,
+          `FAIL 예시: ${item.failExample}`,
+          `피드백 예시: ${item.feedbackExample}`,
+        ].join('\n'),
+      ]),
+      ...guide.commonMistakes.map((mistake) => [guide.sheetName, '흔한 오류', '', mistake]),
+      ...guide.reviewerNotes.map((note) => [guide.sheetName, '평가자 메모', '', note]),
+    ]),
   ]
 }
 

@@ -11,6 +11,7 @@ export type PblPlan = {
   missionSheets: MissionSheet[]
   projectEvaluationSummary: ProjectEvaluationSummary
   references: PblReferences
+  answerGuides?: AnswerGuide[]
   excelWorkbook: ExcelWorkbook
 }
 
@@ -119,4 +120,48 @@ export type ExcelWorkbook = {
 export type ExcelWorkbookSheet = {
   sheetName: string
   rows: string[][]
+}
+
+export type AnswerGuide = {
+  sheetName: string
+  missionStageName: string
+  guideSummary: string
+  expectedOutputs: ExpectedOutput[]
+  stepGuides: StepAnswerGuide[]
+  codeExamples: CodeExample[]
+  evaluationGuide: EvaluationGuideItem[]
+  commonMistakes: string[]
+  reviewerNotes: string[]
+}
+
+export type ExpectedOutput = {
+  title: string
+  format: string
+  sampleContent: string
+  passCondition: string
+}
+
+export type StepAnswerGuide = {
+  step: string
+  title: string
+  expectedResponse: string
+  keyPoints: string[]
+  checkMethod: string
+}
+
+export type CodeExample = {
+  title: string
+  language: string
+  purpose: string
+  code: string
+  expectedResult: string
+  caution: string
+}
+
+export type EvaluationGuideItem = {
+  area: string
+  question: string
+  passExample: string
+  failExample: string
+  feedbackExample: string
 }

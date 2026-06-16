@@ -104,7 +104,10 @@ export default async function handler(request, response) {
 
     if (mode === 'full') {
       const normalizedPlan = normalizePlan(geminiData.updatedPlan, body?.subjectName || currentPlan.subjectName)
-      const changeSummary = asString(geminiData.changeSummary, '전체 피드백을 반영했습니다.')
+      const changeSummary = appendAnswerGuideResetNotice(
+        asString(geminiData.changeSummary, '전체 피드백을 반영했습니다.'),
+        currentPlan.answerGuides?.length ? 'all' : null,
+      )
       return response.status(200).json({ mode, updatedPlan: normalizedPlan, changeSummary })
     }
 
@@ -121,7 +124,11 @@ export default async function handler(request, response) {
       }
 
       const updatedSection = validateSection(targetTypeResult.data, mergeObjects(targetData, geminiData.updatedSection))
-      const updatedPlan = normalizePlan(updateByPath(currentPlan, targetPath, updatedSection), currentPlan.subjectName)
+      const staleGuideSheetName = targetTypeResult.data === 'missionSheet' ? getMissionSheetNameFromPath(currentPlan, targetPath) : null
+      const updatedPlan = normalizePlan(
+        clearAnswerGuides(updateByPath(currentPlan, targetPath, updatedSection), staleGuideSheetName),
+        currentPlan.subjectName,
+      )
       const normalizedSection = getByPath(updatedPlan, targetPath) ?? updatedSection
 
       return response.status(200).json({
@@ -129,7 +136,12 @@ export default async function handler(request, response) {
         targetPath,
         updatedSection: normalizedSection,
         updatedPlan,
-        changeSummary: asString(geminiData.changeSummary, '선택한 섹션을 수정했습니다.'),
+        changeSummary: appendAnswerGuideResetNotice(
+          asString(geminiData.changeSummary, '선택한 섹션을 수정했습니다.'),
+          staleGuideSheetName && currentPlan.answerGuides?.some((guide) => guide.sheetName === staleGuideSheetName)
+            ? staleGuideSheetName
+            : null,
+        ),
       })
     }
 
@@ -143,14 +155,23 @@ export default async function handler(request, response) {
       throw new Error('Gemini가 수정 문장을 반환하지 않았습니다.')
     }
 
-    const updatedPlan = normalizePlan(updateByPath(currentPlan, targetPath, revisedText), currentPlan.subjectName)
+    const staleGuideSheetName = getMissionSheetNameFromPath(currentPlan, targetPath)
+    const updatedPlan = normalizePlan(
+      clearAnswerGuides(updateByPath(currentPlan, targetPath, revisedText), staleGuideSheetName),
+      currentPlan.subjectName,
+    )
     return response.status(200).json({
       mode,
       targetPath,
       previousText: currentText,
       revisedText,
       updatedPlan,
-      changeSummary: asString(geminiData.changeSummary, '선택한 문장을 수정했습니다.'),
+      changeSummary: appendAnswerGuideResetNotice(
+        asString(geminiData.changeSummary, '선택한 문장을 수정했습니다.'),
+        staleGuideSheetName && currentPlan.answerGuides?.some((guide) => guide.sheetName === staleGuideSheetName)
+          ? staleGuideSheetName
+          : null,
+      ),
     })
   } catch (error) {
     console.error('PBL refine failed', error)
@@ -204,6 +225,35 @@ function normalizePlan(plan, fallbackSubjectName) {
   }
   validatePlanConsistency(parsed.data)
   return parsed.data
+}
+
+function clearAnswerGuides(plan, target) {
+  if (!target || !Array.isArray(plan?.answerGuides)) return plan
+  if (target === 'all') {
+    const nextPlan = { ...plan }
+    delete nextPlan.answerGuides
+    return nextPlan
+  }
+
+  const nextAnswerGuides = plan.answerGuides.filter((guide) => guide.sheetName !== target)
+  return {
+    ...plan,
+    ...(nextAnswerGuides.length ? { answerGuides: nextAnswerGuides } : { answerGuides: undefined }),
+  }
+}
+
+function getMissionSheetNameFromPath(plan, path) {
+  const match = /^missionSheets\[(\d+)\]/.exec(path)
+  if (!match) return null
+  return plan?.missionSheets?.[Number(match[1])]?.sheetName || null
+}
+
+function appendAnswerGuideResetNotice(summary, target) {
+  if (!target) return summary
+  const resetMessage = target === 'all'
+    ? 'PBL 본문이 수정되어 기존 예상 답안이 초기화되었어요. 필요한 경우 예상 답안을 다시 생성해주세요.'
+    : '미션지가 수정되어 기존 예상 답안이 초기화되었어요. 필요한 경우 예상 답안을 다시 생성해주세요.'
+  return `${summary} ${resetMessage}`
 }
 
 function buildRefinePrompt({ mode, body, feedback }) {
