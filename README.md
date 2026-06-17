@@ -40,6 +40,7 @@ AI 기반 PBL 과정 자동 생성 기능까지 로컬에서 실행할 때:
 GEMINI_API_KEY=발급받은_API_키
 GEMINI_MODEL=gemini-2.5-flash
 GROQ_API_KEY=발급받은_GROQ_API_키
+GROQ_STAGE_DELAY_MS=65000
 PBL_HISTORY_SCRIPT_URL=발급받은_APPS_SCRIPT_웹앱_URL
 PBL_HISTORY_SCRIPT_SECRET=Apps_Script와_같은_시크릿
 ```
@@ -49,6 +50,7 @@ npx vercel dev
 ```
 
 API 키는 브라우저 코드나 Git 저장소에 넣지 않습니다. 과정설계 요청은 Vercel Function인 `/api/generate-pbl`을 통해 서버에서 선택한 모델로 전달됩니다. 기본 선택 모델은 기존 Gemini 2.5 Flash(`gemini-2.5-flash`)이며, 추가 선택지는 Groq Llama 3.3 70B Versatile(`llama-3.3-70b-versatile`)입니다.
+Groq 선택지는 TPM 한도에 맞추기 위해 프로젝트 골격과 미션 상세를 단계별로 생성한 뒤 서버에서 최종 JSON-ready PBL 구조로 조립합니다. `GROQ_STAGE_DELAY_MS`는 단계 사이 대기 시간이며, 기본값은 65000ms입니다.
 
 ## PBL 생성 이력 저장소 설정
 

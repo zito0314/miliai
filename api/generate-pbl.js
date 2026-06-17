@@ -2,6 +2,10 @@ import { GoogleGenAI } from '@google/genai'
 import { z } from 'zod'
 import { PBL_REFERENCE_URLS } from '../src/config/pblReferenceUrls.js'
 
+export const config = {
+  maxDuration: 300,
+}
+
 const contentStatusSchema = z.enum(['draft', 'draft_ready_for_test', 'review_needed', 'approved'])
 const requiredDeviceSchema = z.enum(['mobile', 'pc', 'both'])
 const learningRoleSchema = z.enum(['understand', 'decide', 'assemble', 'review', 'execute', 'submit'])
@@ -234,6 +238,11 @@ export const pblPlanSchema = pblContentSchema.extend({
 const defaultGeminiModel = 'gemini-2.5-flash'
 const defaultGroqModel = 'llama-3.3-70b-versatile'
 const defaultMaxOutputTokens = 30000
+const groqBlueprintMaxCompletionTokens = 1600
+const groqMissionMaxCompletionTokens = 2800
+const defaultGroqStageDelayMs = 65000
+const groqTechContextMaxChars = 2800
+const groqReferenceBriefMaxChars = 1800
 const defaultGenerationModelId = 'gemini-2.5-flash'
 const generationModelSchema = z.enum(['gemini-2.5-flash', 'groq-llama-3.3-70b-versatile'])
 
@@ -359,10 +368,10 @@ export default async function handler(request, response) {
   }
 
   try {
-    const prompt = buildPrompt(subjectName.slice(0, 200), techContext, referenceUrls)
+    const subject = subjectName.slice(0, 200)
     const generationResult = generationModel.provider === 'groq'
-      ? await generateWithGroq({ apiKey, model: generationModel.model, prompt, referenceUrls })
-      : await generateWithGemini({ apiKey, model: generationModel.model, prompt, referenceUrls })
+      ? await generateWithGroqStaged({ apiKey, model: generationModel.model, subjectName: subject, techContext, referenceUrls })
+      : await generateWithGemini({ apiKey, model: generationModel.model, prompt: buildPrompt(subject, techContext, referenceUrls), referenceUrls })
 
     const generatedPlan = parseGeminiJson(generationResult.text)
     if (!generatedPlan) {
@@ -440,60 +449,395 @@ async function generateWithGemini({ apiKey, model, prompt, referenceUrls }) {
   }
 }
 
-async function generateWithGroq({ apiKey, model, prompt, referenceUrls }) {
-  const { prompt: groqPrompt, failedUrls } = await appendFetchedReferenceContent(prompt, referenceUrls)
-  console.info('PBL generation reference URLs', referenceUrls)
+async function generateWithGroqStaged({ apiKey, model, subjectName, techContext, referenceUrls }) {
+  const { referenceBrief, failedUrls } = await buildGroqReferenceBrief(referenceUrls)
+  const compactTechContext = compactText(techContext, groqTechContextMaxChars)
+  const stageDelayMs = resolveGroqStageDelayMs()
 
-  if (failedUrls.length) {
-    console.warn('PBL generation reference document fetch failed.', { failedUrls })
-  }
-
-  const requestBody = {
+  console.info('Groq staged PBL generation started', {
     model,
-    messages: [{ role: 'user', content: groqPrompt }],
-    temperature: 0.35,
-    max_completion_tokens: defaultMaxOutputTokens,
-    response_format: {
-      type: 'json_schema',
-      json_schema: {
-        name: 'pbl_content',
-        schema: responseJsonSchema,
-      },
-    },
-  }
-
-  console.info('Groq PBL generation request', {
-    model,
-    promptChars: groqPrompt.length,
-    maxCompletionTokens: defaultMaxOutputTokens,
+    stageDelayMs,
+    subjectChars: subjectName.length,
+    techContextChars: compactTechContext.length,
+    referenceBriefChars: referenceBrief.length,
   })
 
-  const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(requestBody),
+  const blueprint = await callGroqJsonStage({
+    apiKey,
+    model,
+    stageName: 'blueprint',
+    prompt: buildGroqBlueprintPrompt({ subjectName, techContext: compactTechContext, referenceBrief }),
+    maxCompletionTokens: groqBlueprintMaxCompletionTokens,
   })
 
-  const data = await groqResponse.json().catch(() => null)
-  if (!groqResponse.ok) {
-    const message = typeof data?.error?.message === 'string' ? data.error.message : `HTTP ${groqResponse.status}`
-    throw new Error(`Groq API 요청 실패: ${message}`)
-  }
+  const rawBlueprint = asObject(blueprint.plan || blueprint.pbl || blueprint)
+  const project = asObject(rawBlueprint.project)
+  const missionBriefs = normalizeGroqMissionBriefs(rawBlueprint.missions, subjectName)
+  const missions = []
 
-  const content = data?.choices?.[0]?.message?.content
-  if (typeof content !== 'string' || !content.trim()) {
-    throw new Error('Groq가 빈 응답을 반환했습니다.')
+  for (const [index, missionBrief] of missionBriefs.entries()) {
+    await waitForGroqStageBudget(`mission-${index + 1}`, stageDelayMs)
+    const mission = await callGroqJsonStage({
+      apiKey,
+      model,
+      stageName: `mission-${index + 1}`,
+      prompt: buildGroqMissionPrompt({
+        subjectName,
+        techContext: compactTechContext,
+        referenceBrief,
+        project,
+        missionBrief,
+        missionIndex: index,
+      }),
+      maxCompletionTokens: groqMissionMaxCompletionTokens,
+    })
+    missions.push(asObject(mission.mission || mission))
   }
 
   return {
-    text: content,
+    text: JSON.stringify({ project, missions }),
     warning: failedUrls.length
-      ? '기준 문서 URL을 일부 확인하지 못했지만, 기본 생성 규칙으로 PBL 초안을 생성했어요.'
-      : null,
+      ? '기준 문서 URL을 일부 확인하지 못했지만, Groq 단계별 생성 방식으로 PBL 초안을 생성했어요.'
+      : 'Groq 한도에 맞춰 프로젝트/미션을 단계별로 생성했어요.',
   }
+}
+
+async function callGroqJsonStage({ apiKey, model, stageName, prompt, maxCompletionTokens }) {
+  console.info('Groq staged PBL generation request', {
+    stageName,
+    model,
+    promptChars: prompt.length,
+    maxCompletionTokens,
+  })
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.35,
+        max_completion_tokens: maxCompletionTokens,
+        response_format: { type: 'json_object' },
+      }),
+    })
+
+    const data = await groqResponse.json().catch(() => null)
+    if (!groqResponse.ok) {
+      const message = typeof data?.error?.message === 'string' ? data.error.message : `HTTP ${groqResponse.status}`
+      if (attempt === 0 && isGroqTpmLimitMessage(message)) {
+        const retryDelayMs = resolveGroqStageDelayMs() || defaultGroqStageDelayMs
+        console.warn('Groq staged PBL generation hit TPM limit. Retrying after delay.', {
+          stageName,
+          retryDelayMs,
+          message,
+        })
+        await sleep(retryDelayMs)
+        continue
+      }
+      throw new Error(`Groq API 요청 실패(${stageName}): ${message}`)
+    }
+
+    const content = data?.choices?.[0]?.message?.content
+    if (typeof content !== 'string' || !content.trim()) {
+      throw new Error(`Groq가 빈 응답을 반환했습니다. stage=${stageName}`)
+    }
+
+    const parsed = parseGeminiJson(content)
+    if (!parsed) {
+      throw new Error(`Groq 응답을 JSON으로 파싱하지 못했습니다. stage=${stageName}`)
+    }
+
+    return parsed
+  }
+
+  throw new Error(`Groq API 요청 실패(${stageName}): 재시도 후에도 응답을 받지 못했습니다.`)
+}
+
+function isGroqTpmLimitMessage(message) {
+  return /tokens per minute|tpm|rate limit/i.test(message)
+}
+
+async function waitForGroqStageBudget(stageName, delayMs) {
+  if (!delayMs) return
+  console.info('Groq staged PBL generation waiting for TPM window', { stageName, delayMs })
+  await sleep(delayMs)
+}
+
+function resolveGroqStageDelayMs() {
+  const configured = Number.parseInt(process.env.GROQ_STAGE_DELAY_MS || '', 10)
+  if (Number.isFinite(configured) && configured >= 0) {
+    return Math.min(configured, 120000)
+  }
+  return defaultGroqStageDelayMs
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function buildGroqReferenceBrief(referenceUrls) {
+  const entries = await Promise.all(
+    Object.entries(referenceUrls).map(async ([label, url]) => {
+      const text = await fetchReferenceText(url)
+      return { label, url, text }
+    }),
+  )
+  const failedUrls = entries.filter((entry) => !entry.text).map((entry) => entry.url)
+  const usableEntries = entries.filter((entry) => entry.text)
+  const perEntryMaxChars = Math.floor(groqReferenceBriefMaxChars / Math.max(usableEntries.length, 1))
+  const referenceBrief = usableEntries
+    .map((entry) => [
+      `## ${getReferenceDocumentLabel(entry.label)}`,
+      compactText(entry.text, perEntryMaxChars),
+    ].join('\n'))
+    .join('\n\n')
+
+  return {
+    referenceBrief: referenceBrief || '기준 문서 본문을 가져오지 못했습니다. 서버 내장 PBL 작성 규칙을 우선 적용합니다.',
+    failedUrls,
+  }
+}
+
+function buildGroqBlueprintPrompt({ subjectName, techContext, referenceBrief }) {
+  return `너는 Mili AI PBL 콘텐츠 기획자다.
+Groq TPM 한도 안에서 단계별로 생성한다. 이번 단계는 전체 PBL의 "프로젝트 개요와 미션 골격"만 만든다.
+반드시 JSON object만 반환한다. 마크다운, 코드블록, 설명 문장은 반환하지 않는다.
+
+[과목명]
+${subjectName}
+
+[참고 기술 사전]
+${techContext || '별도 기술 컨텍스트 없음'}
+
+[기준 문서 요약]
+${referenceBrief}
+
+[작성 원칙]
+- PBL-first, Mission-Based Learning 방식으로 작성한다.
+- 군 장병이 실제로 접할 수 있는 업무/훈련/군수/행정/안전/교육 문제에서 출발한다.
+- 실제 군 내부 데이터, 개인정보, 보안 민감 정보 사용을 요구하지 않는다.
+- 모바일 활동과 PC 검증을 분리한다.
+- 모바일은 상황 이해, 선택, 순서 배열, 코드 읽기, 오류 찾기, 결과 예측 중심이다.
+- PC는 긴 코드 실행, 검증, 파일/URL 제출 중심이다.
+- 서버가 ID, workbook, 기본 UI 사전, 검토표를 보정하므로 이번 단계에서는 핵심 기획 품질에 집중한다.
+
+[반환 JSON 형태]
+{
+  "project": {
+    "title": "프로젝트명",
+    "short_description": "한 문장 설명",
+    "environment_type": "모바일 중심 + PC 검증형",
+    "duration_label": "예: 3주 / 모바일 세션 + PC 검증",
+    "target_learner": "AI 활용 경험이 많지 않은 군 장병",
+    "difficulty_label": "3~4레벨",
+    "project_goal": "최종 학습 목표",
+    "learning_mode": "모바일 카드 활동, AI 교관 질문, PC 검증",
+    "prerequisites": "선수 지식",
+    "tech_stack": "사용 기술",
+    "final_outputs": "최종 산출물",
+    "constraints": "비식별/가상/공개 데이터 사용",
+    "pc_alternative": "PC 접근이 어려울 때 대체 과제",
+    "planner_note": "기획자 검토 메모",
+    "developer_note": "개발 구현 메모"
+  },
+  "missions": [
+    {
+      "title": "미션 1 제목",
+      "mission_overview": "미션 설명",
+      "learning_goal": "학습 목표",
+      "core_learning_action": "핵심 행동",
+      "student_outputs": "학생 산출물",
+      "estimated_time": "예: 20~30분",
+      "scenario_focus": "군 실무 문제 상황",
+      "step_focus": ["상황 이해", "판단 기준 선택", "해결 순서 조립", "모바일 검토", "간단 제출"]
+    },
+    {
+      "title": "미션 2 제목",
+      "mission_overview": "미션 설명",
+      "learning_goal": "학습 목표",
+      "core_learning_action": "핵심 행동",
+      "student_outputs": "학생 산출물",
+      "estimated_time": "예: 30~40분",
+      "scenario_focus": "검증과 제출 상황",
+      "step_focus": ["개념 확인", "오류 원인 찾기", "결과 예측", "PC 검증", "최종 제출"]
+    }
+  ]
+}
+
+missions는 정확히 2개만 반환한다.
+모든 문자열은 한국어로 구체적으로 작성한다.`
+}
+
+function buildGroqMissionPrompt({ subjectName, techContext, referenceBrief, project, missionBrief, missionIndex }) {
+  const stepPattern = getGroqMissionStepPattern(missionIndex)
+
+  return `너는 Mili AI PBL 콘텐츠 기획자다.
+이번 단계는 하나의 mission 상세만 생성한다. 반드시 JSON object만 반환한다.
+
+[과목명]
+${subjectName}
+
+[프로젝트 개요]
+${compactText(JSON.stringify(project), 1600)}
+
+[이번 미션 골격]
+${compactText(JSON.stringify(missionBrief), 1400)}
+
+[참고 기술 사전]
+${compactText(techContext, 1600) || '별도 기술 컨텍스트 없음'}
+
+[기준 문서 요약]
+${compactText(referenceBrief, 1200)}
+
+[이번 미션의 step 패턴]
+${stepPattern}
+
+[필수 작성 원칙]
+- mission은 군 실무 문제에서 출발해야 한다.
+- steps는 정확히 5개 작성한다.
+- 각 step은 하나의 작은 학습 행동만 담는다.
+- 학생 노출 문구와 내부 검토 메모를 분리한다.
+- learner_text/question/body는 학생에게 보이는 문구다.
+- planner_note/developer_note는 내부 검토/구현 메모다.
+- 선택형, 순서형, 코드 빈칸, 오류 찾기, 결과 예측 step은 options 3~4개를 포함한다.
+- 정답 선택지는 is_correct: true, is_expected: true로 표시한다.
+- 오답에도 explanation을 포함한다.
+- 모바일에서는 긴 코드 전체 작성을 요구하지 않는다.
+- PC 검증 step은 pc_verification block_type과 required_device/device_target: "pc"를 사용한다.
+- 실제 군 내부 데이터, 개인정보, 보안 민감 정보 입력을 요구하지 않는다.
+
+[반환 JSON 형태]
+{
+  "title": "미션 제목",
+  "environment_type": "모바일 중심 + PC 검증형",
+  "estimated_time": "예: 20~30분",
+  "core_learning_action": "핵심 행동",
+  "student_outputs": "학생 산출물",
+  "planner_review_points": "기획자 검토 포인트",
+  "developer_note": "개발 구현 메모",
+  "mission_overview": "미션 설명",
+  "learning_goal": "학습 목표",
+  "prerequisites": "선수 지식",
+  "tech_stack": "사용 기술",
+  "constraints": "비식별/가상/공개 데이터 사용",
+  "is_pc_required": true,
+  "has_mobile_alternative": true,
+  "steps": [
+    {
+      "section": "이해|학습활동|검토|PC 검증|제출",
+      "block_type": "situation_card|concept_card|single_choice|multiple_choice|sequence_order|code_fill_blank|code_error_finding|result_prediction|ai_tutor_question|self_checklist|peer_review_request|pc_verification",
+      "title": "Step 제목",
+      "learner_text": "학생 안내",
+      "learner_action": "학생 행동",
+      "input_type": "block_type과 호환되는 입력 타입",
+      "required_device": "mobile|pc|both",
+      "device_target": "mobile|pc|both",
+      "learning_role": "understand|decide|assemble|review|execute|submit",
+      "body": "본문",
+      "question": "질문",
+      "options": [
+        { "label": "선택지", "is_correct": true, "is_expected": true, "explanation": "해설", "expected_order": null }
+      ],
+      "expected_answer_text": "기대 답안",
+      "hint": "힌트",
+      "explanation": "해설",
+      "completion_rule": "완료 기준",
+      "planner_note": "기획 의도와 검토 포인트",
+      "developer_note": "UI/저장/채점 구현 메모",
+      "mobile_summary": "모바일 요약",
+      "pc_detail": "PC 수행 상세"
+    }
+  ],
+  "submission": {
+    "submission_title": "제출명",
+    "student_instruction": "제출 안내",
+    "evaluation_text": "평가 안내",
+    "pass_criteria": "PASS 기준",
+    "needs_revision_example": "보완 필요 예시",
+    "peer_review_required": true,
+    "peer_review_mode": "선택|필수|없음",
+    "developer_note": "제출 저장 구현 메모"
+  }
+}
+
+JSON에 project, ui_blocks, environment_tags, validation_checklist, excelWorkbook은 포함하지 않는다.
+모든 문자열은 한국어로 작성한다.`
+}
+
+function getGroqMissionStepPattern(index) {
+  if (index === 0) {
+    return [
+      '1. situation_card: 군 실무 문제 상황과 제약조건을 읽는다.',
+      '2. single_choice 또는 multiple_choice: 문제 원인/판단 기준을 선택한다.',
+      '3. sequence_order: 해결 절차 또는 데이터 처리 순서를 조립한다.',
+      '4. code_fill_blank 또는 result_prediction: 모바일에서 짧은 코드/결과를 판단한다.',
+      '5. ai_tutor_question 또는 self_checklist: AI 교관 질문이나 자기 점검으로 산출물 기준을 확인한다.',
+    ].join('\n')
+  }
+
+  return [
+    '1. concept_card: 미션 수행에 필요한 핵심 개념을 확인한다.',
+    '2. code_error_finding 또는 result_prediction: 오류 원인 또는 실행 결과를 예측한다.',
+    '3. self_checklist 또는 peer_review_request: 제출 전 기준을 점검한다.',
+    '4. pc_verification: PC에서 실행/검증할 과제와 성공 기준을 안내한다.',
+    '5. peer_review_request 또는 self_checklist: 최종 제출 전 피드백/점검을 수행한다.',
+  ].join('\n')
+}
+
+function normalizeGroqMissionBriefs(value, subjectName) {
+  const rawMissions = asArray(value).slice(0, 2)
+  const fallbackMissions = [
+    {
+      title: `${subjectName} 문제 상황 분석`,
+      mission_overview: '군 실무 문제 상황을 이해하고 판단 기준을 세웁니다.',
+      learning_goal: '문제 원인과 해결 절차를 모바일 활동으로 정리합니다.',
+      core_learning_action: '상황 이해, 기준 선택, 절차 조립',
+      student_outputs: '문제 정의와 해결 절차 초안',
+      estimated_time: '20~30분',
+      scenario_focus: '군 실무 문제 상황',
+      step_focus: ['상황 이해', '판단 기준 선택', '해결 순서 조립', '모바일 검토', '간단 제출'],
+    },
+    {
+      title: `${subjectName} 검증과 제출`,
+      mission_overview: '모바일에서 검토한 해결안을 PC에서 검증하고 제출합니다.',
+      learning_goal: '검증 기준과 최종 산출물 품질을 확인합니다.',
+      core_learning_action: '결과 예측, PC 검증, 제출 전 점검',
+      student_outputs: '검증 결과와 최종 제출물',
+      estimated_time: '30~40분',
+      scenario_focus: 'PC 검증과 제출 상황',
+      step_focus: ['개념 확인', '오류 원인 찾기', '결과 예측', 'PC 검증', '최종 제출'],
+    },
+  ]
+
+  return Array.from({ length: 2 }, (_, index) => {
+    const rawMission = asObject(rawMissions[index])
+    const fallback = fallbackMissions[index]
+    return {
+      title: asString(rawMission.title, fallback.title),
+      mission_overview: asString(rawMission.mission_overview, fallback.mission_overview),
+      learning_goal: asString(rawMission.learning_goal, fallback.learning_goal),
+      core_learning_action: asString(rawMission.core_learning_action, fallback.core_learning_action),
+      student_outputs: asString(rawMission.student_outputs, fallback.student_outputs),
+      estimated_time: asString(rawMission.estimated_time, fallback.estimated_time),
+      scenario_focus: asString(rawMission.scenario_focus, fallback.scenario_focus),
+      step_focus: normalizeStringArray(rawMission.step_focus, fallback.step_focus, 3, 5),
+    }
+  })
+}
+
+function compactText(value, maxChars) {
+  if (!value) return ''
+  const compacted = String(value)
+    .replace(/\r\n/g, '\n')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+  return compacted.length > maxChars ? `${compacted.slice(0, maxChars)}\n...(이하 생략)` : compacted
 }
 
 async function appendFetchedReferenceContent(prompt, referenceUrls) {
