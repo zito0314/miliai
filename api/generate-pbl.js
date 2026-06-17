@@ -145,9 +145,19 @@ export const pblPlanSchema = z.object({
   }),
 })
 
+const defaultGeminiModel = 'gemini-2.5-flash'
+const defaultGroqModel = 'openai/gpt-oss-120b'
+const defaultGenerationModelId = 'gemini-2.5-flash'
+const generationModelSchema = z.enum(['gemini-2.5-flash', 'groq-gpt-oss-120b'])
+
 const responseJsonSchema = z.toJSONSchema(pblPlanSchema, { target: 'draft-7' })
 delete responseJsonSchema.$schema
-simplifyGeminiSchema(responseJsonSchema)
+
+const geminiResponseJsonSchema = cloneJsonSchema(responseJsonSchema)
+simplifyGeminiSchema(geminiResponseJsonSchema)
+
+const groqResponseJsonSchema = cloneJsonSchema(responseJsonSchema)
+simplifyGroqSchema(groqResponseJsonSchema)
 
 export default async function handler(request, response) {
   if (request.method !== 'POST') {
@@ -158,44 +168,35 @@ export default async function handler(request, response) {
   const body = typeof request.body === 'string' ? safeJsonParse(request.body) : request.body
   const subjectName = typeof body?.subjectName === 'string' ? body.subjectName.trim() : ''
   const techContext = typeof body?.techContext === 'string' ? body.techContext.trim().slice(0, 30000) : ''
+  const generationModel = resolveGenerationModel(body?.generationModel)
 
   if (!subjectName) {
     return response.status(400).json({ error: '과목명을 입력해주세요.' })
   }
 
-  const apiKey = process.env.GEMINI_API_KEY
+  const apiKey = generationModel.provider === 'groq'
+    ? process.env.GROQ_API_KEY
+    : process.env.GEMINI_API_KEY
   if (!apiKey) {
-    return response.status(500).json({ error: '서버에 Gemini API Key가 설정되지 않았습니다.' })
+    const providerLabel = generationModel.provider === 'groq' ? 'Groq' : 'Gemini'
+    return response.status(500).json({ error: `서버에 ${providerLabel} API Key가 설정되지 않았습니다.` })
   }
 
   try {
-    const ai = new GoogleGenAI({ apiKey })
-    const model = process.env.GEMINI_MODEL?.trim() || 'gemini-2.5-flash'
-    const result = await ai.models.generateContent({
-      model,
-      contents: buildPrompt(subjectName.slice(0, 200), techContext),
-      config: {
-        temperature: 0.35,
-        maxOutputTokens: 30000,
-        responseMimeType: 'application/json',
-        responseJsonSchema,
-      },
-    })
-
-    if (!result.text) {
-      throw new Error('Gemini가 빈 응답을 반환했습니다.')
-    }
-
-    const generatedPlan = safeJsonParse(result.text)
+    const prompt = buildPrompt(subjectName.slice(0, 200), techContext)
+    const generatedText = generationModel.provider === 'groq'
+      ? await generateWithGroq({ apiKey, model: generationModel.model, prompt })
+      : await generateWithGemini({ apiKey, model: generationModel.model, prompt })
+    const generatedPlan = safeJsonParse(generatedText)
     if (!generatedPlan) {
-      throw new Error('Gemini 응답을 JSON으로 파싱하지 못했습니다.')
+      throw new Error(`${generationModel.providerLabel} 응답을 JSON으로 파싱하지 못했습니다.`)
     }
 
     const normalizedPlan = normalizeGeneratedPlan(generatedPlan, subjectName)
     const parsed = pblPlanSchema.safeParse(normalizedPlan)
     if (!parsed.success) {
       console.error('PBL schema validation issues', parsed.error.issues.slice(0, 12))
-      throw new Error('Gemini 응답이 과정설계 JSON 구조와 맞지 않습니다.')
+      throw new Error(`${generationModel.providerLabel} 응답이 과정설계 JSON 구조와 맞지 않습니다.`)
     }
 
     validatePlanConsistency(parsed.data)
@@ -206,6 +207,80 @@ export default async function handler(request, response) {
       error: '콘텐츠 생성 중 오류가 발생했어요. 잠시 후 다시 시도해주세요.',
     })
   }
+}
+
+function resolveGenerationModel(value) {
+  const selectedModelId = generationModelSchema.safeParse(value).success ? value : defaultGenerationModelId
+  if (selectedModelId === 'groq-gpt-oss-120b') {
+    return {
+      id: selectedModelId,
+      provider: 'groq',
+      providerLabel: 'Groq',
+      model: process.env.GROQ_MODEL?.trim() || defaultGroqModel,
+    }
+  }
+
+  return {
+    id: defaultGenerationModelId,
+    provider: 'gemini',
+    providerLabel: 'Gemini',
+    model: process.env.GEMINI_MODEL?.trim() || defaultGeminiModel,
+  }
+}
+
+async function generateWithGemini({ apiKey, model, prompt }) {
+  const ai = new GoogleGenAI({ apiKey })
+  const result = await ai.models.generateContent({
+    model,
+    contents: prompt,
+    config: {
+      temperature: 0.35,
+      maxOutputTokens: 30000,
+      responseMimeType: 'application/json',
+      responseJsonSchema: geminiResponseJsonSchema,
+    },
+  })
+
+  if (!result.text) {
+    throw new Error('Gemini가 빈 응답을 반환했습니다.')
+  }
+  return result.text
+}
+
+async function generateWithGroq({ apiKey, model, prompt }) {
+  const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model,
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.35,
+      max_completion_tokens: 30000,
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: 'pbl_plan',
+          strict: true,
+          schema: groqResponseJsonSchema,
+        },
+      },
+    }),
+  })
+
+  const data = await groqResponse.json().catch(() => null)
+  if (!groqResponse.ok) {
+    const message = typeof data?.error?.message === 'string' ? data.error.message : `HTTP ${groqResponse.status}`
+    throw new Error(`Groq API 요청 실패: ${message}`)
+  }
+
+  const content = data?.choices?.[0]?.message?.content
+  if (typeof content !== 'string' || !content.trim()) {
+    throw new Error('Groq가 빈 응답을 반환했습니다.')
+  }
+  return content
 }
 
 export function validatePlanConsistency(plan) {
@@ -794,6 +869,22 @@ export function simplifyGeminiSchema(value) {
   delete value.minItems
   delete value.maxItems
   Object.values(value).forEach(simplifyGeminiSchema)
+}
+
+function simplifyGroqSchema(value) {
+  if (Array.isArray(value)) {
+    value.forEach(simplifyGroqSchema)
+    return
+  }
+  if (!value || typeof value !== 'object') return
+
+  delete value.minItems
+  delete value.maxItems
+  Object.values(value).forEach(simplifyGroqSchema)
+}
+
+function cloneJsonSchema(value) {
+  return JSON.parse(JSON.stringify(value))
 }
 
 function buildPrompt(subjectName, techContext) {

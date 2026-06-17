@@ -1,13 +1,18 @@
 import type { PblPlan } from '../types/pbl'
+import type { GenerationModelId } from '../types/generationModel'
 import type { TechItem } from '../types/tech'
 import { buildTechContext } from '../utils/buildTechContext'
 
-export async function generatePblPlan(subjectName: string, techItems: TechItem[]): Promise<PblPlan> {
+export async function generatePblPlan(
+  subjectName: string,
+  techItems: TechItem[],
+  generationModel: GenerationModelId,
+): Promise<PblPlan> {
   const techContext = buildTechContext(subjectName, techItems)
   const response = await fetch('/api/generate-pbl', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ subjectName, techContext }),
+    body: JSON.stringify({ subjectName, techContext, generationModel }),
   })
 
   const data = await response.json().catch(() => null)

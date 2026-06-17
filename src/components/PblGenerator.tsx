@@ -1,9 +1,30 @@
-import { useState } from 'react'
-import { BulbOutlined, ThunderboltOutlined } from '@ant-design/icons'
-import { Alert, Button, Input } from 'antd'
+import { useEffect, useState } from 'react'
+import { BulbOutlined, DeleteOutlined, FolderOpenOutlined, HistoryOutlined, ThunderboltOutlined } from '@ant-design/icons'
+import { Alert, Button, Input, Select, Tag } from 'antd'
+import {
+  DEFAULT_GENERATION_MODEL_ID,
+  GENERATION_MODEL_OPTIONS,
+  type GenerationModelId,
+} from '../types/generationModel'
+import type { PblGenerationHistoryRecord } from '../types/pblHistory'
 import type { PblPlan } from '../types/pbl'
 import type { TechItem } from '../types/tech'
 import { generatePblPlan } from '../services/generatePblPlan'
+import {
+  clearRemotePblGenerationHistory,
+  deleteRemotePblGenerationHistoryRecord,
+  fetchRemotePblGenerationHistory,
+  upsertRemotePblGenerationHistoryRecord,
+} from '../services/pblGenerationHistoryApi'
+import {
+  clearPblGenerationHistory,
+  createPblGenerationHistoryRecord,
+  deletePblGenerationHistoryRecord,
+  loadPblGenerationHistory,
+  savePblGenerationHistory,
+  updatePblGenerationHistoryRecord,
+  upsertPblGenerationHistoryRecord,
+} from '../utils/pblGenerationHistory'
 import { PblPlanResult } from './PblPlanResult'
 
 type PblGeneratorProps = {
@@ -17,6 +38,41 @@ export function PblGenerator({ techItems, isTechItemsLoading }: PblGeneratorProp
   const [planHistory, setPlanHistory] = useState<PblPlan[]>([])
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [generationModel, setGenerationModel] = useState<GenerationModelId>(DEFAULT_GENERATION_MODEL_ID)
+  const [generationRecords, setGenerationRecords] = useState<PblGenerationHistoryRecord[]>(() =>
+    loadPblGenerationHistory(),
+  )
+  const [activeHistoryId, setActiveHistoryId] = useState<string | null>(null)
+
+  const replaceHistoryRecords = (records: PblGenerationHistoryRecord[]) => {
+    const savedRecords = savePblGenerationHistory(records)
+    setGenerationRecords(savedRecords)
+    if (activeHistoryId && !savedRecords.some((record) => record.id === activeHistoryId)) {
+      setActiveHistoryId(null)
+    }
+  }
+
+  const syncRemoteHistoryRecords = (records: PblGenerationHistoryRecord[] | null) => {
+    if (records !== null) replaceHistoryRecords(records)
+  }
+
+  useEffect(() => {
+    let ignore = false
+
+    void fetchRemotePblGenerationHistory()
+      .then((remoteRecords) => {
+        if (ignore || remoteRecords === null) return
+        const savedRecords = savePblGenerationHistory(remoteRecords)
+        setGenerationRecords(savedRecords)
+      })
+      .catch((historyError) => {
+        console.warn('Remote PBL history load failed', historyError)
+      })
+
+    return () => {
+      ignore = true
+    }
+  }, [])
 
   const handleGenerate = async () => {
     const trimmedSubject = subjectName.trim()
@@ -28,8 +84,17 @@ export function PblGenerator({ techItems, isTechItemsLoading }: PblGeneratorProp
     setGenerating(true)
     setError(null)
     try {
-      setPlan(await generatePblPlan(trimmedSubject, techItems))
+      const generatedPlan = await generatePblPlan(trimmedSubject, techItems, generationModel)
+      const historyRecord = createPblGenerationHistoryRecord(generatedPlan, generationModel)
+      setPlan(generatedPlan)
       setPlanHistory([])
+      setActiveHistoryId(historyRecord.id)
+      setGenerationRecords((currentRecords) => upsertPblGenerationHistoryRecord(currentRecords, historyRecord))
+      void upsertRemotePblGenerationHistoryRecord(historyRecord)
+        .then(syncRemoteHistoryRecords)
+        .catch((historyError) => {
+          console.warn('Remote PBL history save failed', historyError)
+        })
     } catch (generationError) {
       setError(
         generationError instanceof Error
@@ -49,17 +114,61 @@ export function PblGenerator({ techItems, isTechItemsLoading }: PblGeneratorProp
       setPlanHistory((currentHistory) => [...currentHistory, currentPlan])
       return updatedPlan
     })
+    persistActivePlan(updatedPlan)
   }
 
   const handleUndo = () => {
-    setPlanHistory((currentHistory) => {
-      const previousPlan = currentHistory.at(-1)
-      if (previousPlan) {
-        setPlan(previousPlan)
-        return currentHistory.slice(0, -1)
+    const previousPlan = planHistory.at(-1)
+    if (!previousPlan) return
+
+    setPlan(previousPlan)
+    setPlanHistory(planHistory.slice(0, -1))
+    persistActivePlan(previousPlan)
+  }
+
+  const persistActivePlan = (updatedPlan: PblPlan) => {
+    if (!activeHistoryId) return
+    setGenerationRecords((currentRecords) => {
+      const nextRecords = updatePblGenerationHistoryRecord(currentRecords, activeHistoryId, updatedPlan)
+      const nextRecord = nextRecords.find((record) => record.id === activeHistoryId)
+      if (nextRecord) {
+        void upsertRemotePblGenerationHistoryRecord(nextRecord)
+          .then(syncRemoteHistoryRecords)
+          .catch((historyError) => {
+            console.warn('Remote PBL history update failed', historyError)
+          })
       }
-      return currentHistory
+      return nextRecords
     })
+  }
+
+  const handleOpenHistoryRecord = (record: PblGenerationHistoryRecord) => {
+    setPlan(record.plan)
+    setSubjectName(record.subjectName)
+    setGenerationModel(record.generationModel)
+    setPlanHistory([])
+    setActiveHistoryId(record.id)
+    setError(null)
+  }
+
+  const handleDeleteHistoryRecord = (recordId: string) => {
+    setGenerationRecords((currentRecords) => deletePblGenerationHistoryRecord(currentRecords, recordId))
+    if (activeHistoryId === recordId) setActiveHistoryId(null)
+    void deleteRemotePblGenerationHistoryRecord(recordId)
+      .then(syncRemoteHistoryRecords)
+      .catch((historyError) => {
+        console.warn('Remote PBL history delete failed', historyError)
+      })
+  }
+
+  const handleClearHistory = () => {
+    setGenerationRecords(clearPblGenerationHistory())
+    setActiveHistoryId(null)
+    void clearRemotePblGenerationHistory()
+      .then(syncRemoteHistoryRecords)
+      .catch((historyError) => {
+        console.warn('Remote PBL history clear failed', historyError)
+      })
   }
 
   return (
@@ -88,6 +197,18 @@ export function PblGenerator({ techItems, isTechItemsLoading }: PblGeneratorProp
               if (!generating && !unavailable) void handleGenerate()
             }}
           />
+          <Select<GenerationModelId>
+            className="pbl-model-select"
+            size="large"
+            value={generationModel}
+            aria-label="생성 모델"
+            disabled={generating}
+            options={GENERATION_MODEL_OPTIONS.map((option) => ({
+              value: option.id,
+              label: `${option.provider}: ${option.modelName}`,
+            }))}
+            onChange={setGenerationModel}
+          />
           <Button
             type="primary"
             size="large"
@@ -103,6 +224,14 @@ export function PblGenerator({ techItems, isTechItemsLoading }: PblGeneratorProp
         {unavailable && <p className="pbl-generator-help">기술 데이터를 불러온 뒤 생성할 수 있어요.</p>}
         {error && <Alert className="pbl-generator-error" type="error" showIcon title={error} />}
 
+        <PblGenerationHistoryPanel
+          records={generationRecords}
+          activeHistoryId={activeHistoryId}
+          onOpen={handleOpenHistoryRecord}
+          onDelete={handleDeleteHistoryRecord}
+          onClear={handleClearHistory}
+        />
+
         {plan && (
           <PblPlanResult
             plan={plan}
@@ -116,4 +245,81 @@ export function PblGenerator({ techItems, isTechItemsLoading }: PblGeneratorProp
       </div>
     </section>
   )
+}
+
+function PblGenerationHistoryPanel({
+  records,
+  activeHistoryId,
+  onOpen,
+  onDelete,
+  onClear,
+}: {
+  records: PblGenerationHistoryRecord[]
+  activeHistoryId: string | null
+  onOpen: (record: PblGenerationHistoryRecord) => void
+  onDelete: (recordId: string) => void
+  onClear: () => void
+}) {
+  return (
+    <section className="pbl-history-panel" aria-label="PBL 생성 이력">
+      <div className="pbl-history-heading">
+        <div>
+          <span><HistoryOutlined /> 생성 이력</span>
+          <strong>{records.length}개 저장됨</strong>
+        </div>
+        <Button
+          size="small"
+          danger
+          icon={<DeleteOutlined />}
+          disabled={records.length === 0}
+          onClick={onClear}
+        >
+          전체 삭제
+        </Button>
+      </div>
+
+      {records.length === 0 ? (
+        <p className="pbl-history-empty">저장된 생성 이력이 없습니다.</p>
+      ) : (
+        <div className="pbl-history-list">
+          {records.map((record) => (
+            <article
+              className={`pbl-history-item${record.id === activeHistoryId ? ' is-active' : ''}`}
+              key={record.id}
+              aria-current={record.id === activeHistoryId ? 'true' : undefined}
+            >
+              <div className="pbl-history-main">
+                <strong>{record.title}</strong>
+                <span>{record.subjectName}</span>
+                <div className="pbl-history-meta">
+                  <span>{formatHistoryDate(record.updatedAt)}</span>
+                  <Tag>{record.generationModelName}</Tag>
+                  <Tag>{record.plan.missionSheetCount}개 미션</Tag>
+                  {record.id === activeHistoryId && <Tag color="green">열림</Tag>}
+                </div>
+              </div>
+              <div className="pbl-history-actions">
+                <Button size="small" icon={<FolderOpenOutlined />} onClick={() => onOpen(record)}>
+                  불러오기
+                </Button>
+                <Button size="small" danger icon={<DeleteOutlined />} onClick={() => onDelete(record.id)}>
+                  삭제
+                </Button>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
+function formatHistoryDate(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+
+  return new Intl.DateTimeFormat('ko-KR', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(date)
 }
