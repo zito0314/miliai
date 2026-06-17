@@ -1532,6 +1532,9 @@ function simplifyGroqSchema(value) {
   delete value.minItems
   delete value.maxItems
   delete value.default
+  if (value.properties && typeof value.properties === 'object' && !Array.isArray(value.properties)) {
+    value.required = Object.keys(value.properties)
+  }
   Object.values(value).forEach(simplifyGroqSchema)
 }
 
