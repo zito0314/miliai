@@ -178,6 +178,26 @@ PC가 필요한 작업은 별도 step으로 분리한다.
 학생 노출 문구는 쉽고 직접적으로 작성한다.
 내부 메모는 기획자와 개발자가 검토할 수 있도록 구체적으로 작성한다.
 
+플랫폼 렌더링용 step 구조를 보강하더라도 기획자용 검토 정보는 제거하지 않는다.
+
+반드시 유지할 필드:
+
+- `project.planner_note`
+- `project.developer_note`
+- `missions[].planner_review_points`
+- `missions[].developer_note`
+- `missions[].steps[].planner_note`
+- `missions[].steps[].developer_note`
+- `missions[].steps[].expected_answer_text`
+- `missions[].steps[].completion_rule`
+- `missions[].submission.evaluation_text`
+- `missions[].submission.pass_criteria`
+- `validation_checklist[]`
+
+`planner_note`에는 기획 의도, 학습자가 헷갈릴 지점, 난이도 조정 포인트, 모바일 수행성, PC 검증이 필요한 이유, 평가자가 확인할 핵심 기준, 실제 군 데이터나 개인정보를 요구하지 않도록 주의할 점을 포함한다.
+
+`developer_note`에는 추천 UI block 형태, 저장해야 할 사용자 입력값, 자동채점 가능 여부, 정답/해설 노출 여부, 모바일/PC 표시 방식, 제출 또는 피어리뷰와 연결되는 데이터를 포함한다.
+
 ---
 
 ## 8. 예상 답안과 평가 기준

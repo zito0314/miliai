@@ -163,8 +163,8 @@ function normalizeProject(project: Project): Project {
     pc_alternative: asString(project?.pc_alternative, 'PC 접근이 어려운 학습자는 모바일에서 의사결정 기준표와 검토 질문 답변으로 대체 제출합니다.'),
     is_student_visible: typeof project?.is_student_visible === 'boolean' ? project.is_student_visible : true,
     content_status: normalizeEnum(project?.content_status, contentStatuses, 'draft'),
-    planner_note: asString(project?.planner_note, '프로젝트 흐름, 모바일 수행성, PC 검증 범위가 적절한지 검토합니다.'),
-    developer_note: asString(project?.developer_note, 'project_id를 기준으로 missions, steps, submissions를 연결합니다.'),
+    planner_note: asString(project?.planner_note, '기획자 검토 필요: 프로젝트 의도, 모바일 수행성, PC 검증 범위, 평가 가능성, 비식별/가상 데이터 사용 원칙을 확인하세요.'),
+    developer_note: asString(project?.developer_note, '개발 참고: project_id를 기준으로 missions, steps, submissions를 연결하고 모바일/PC 표시 방식과 저장 데이터를 매핑하세요.'),
   }
 }
 
@@ -192,8 +192,8 @@ function normalizeMission(mission: Mission | undefined, project: Project, index:
     estimated_time: asString(mission?.estimated_time, index >= 2 ? '20~30분' : '15~25분'),
     core_learning_action: asString(mission?.core_learning_action, '문제 상황 확인, 기준 선택, 산출물 작성'),
     student_outputs: asString(mission?.student_outputs, '활동 기록과 미션 제출물'),
-    planner_review_points: asString(mission?.planner_review_points, '학생 노출 문구와 내부 검토 메모가 분리되어 있는지 확인합니다.'),
-    developer_note: asString(mission?.developer_note, 'mission_id를 기준으로 step과 submission을 저장합니다.'),
+    planner_review_points: asString(mission?.planner_review_points, '기획자 검토 필요: 미션 의도, 학습자가 헷갈릴 지점, 난이도 조정 포인트, 산출물 평가 기준을 확인하세요.'),
+    developer_note: asString(mission?.developer_note, '개발 참고: mission_id를 기준으로 step, option, submission 데이터를 저장하고 피어리뷰/제출 흐름과 연결하세요.'),
     mission_overview: asString(mission?.mission_overview, `${project.title}의 ${index + 1}번째 미션입니다.`),
     learning_goal: asString(mission?.learning_goal, '실무 문제를 판단 가능한 학습 활동으로 정리합니다.'),
     prerequisites: asString(mission?.prerequisites, project.prerequisites),
@@ -250,8 +250,8 @@ function normalizeStep(step: Step | undefined, projectId: string, missionId: str
     is_student_visible: typeof step?.is_student_visible === 'boolean' ? step.is_student_visible : true,
     required_device: deviceTarget,
     completion_rule: asString(step?.completion_rule, fallbackCompletionRule(blockType, hasOptions)),
-    planner_note: asString(step?.planner_note, '학생에게 보이는 문구와 기대 기준이 분리되어 있는지 확인합니다.'),
-    developer_note: asString(step?.developer_note, `step_id ${stepId}를 기준으로 응답과 선택지를 저장합니다.`),
+    planner_note: asString(step?.planner_note, '기획자 검토 필요: 이 Step의 기획 의도, 모바일 수행성, 정답/해설 노출 여부, 평가자가 확인할 핵심 기준을 확인하세요.'),
+    developer_note: asString(step?.developer_note, `개발 참고: step_id ${stepId}와 block_type을 기준으로 UI 컴포넌트, 사용자 입력 저장값, 자동채점 가능 여부를 매핑하세요.`),
     options,
     body: asNullableString(step?.body) || undefined,
     question: asNullableString(step?.question) || questionFromBlockType(blockType, step?.title),

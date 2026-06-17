@@ -366,6 +366,14 @@ function MissionDetailList({
               <dt>모바일 대체</dt>
               <dd>{mission.has_mobile_alternative ? '있음' : '없음'}</dd>
             </div>
+            <div>
+              <dt>기획자 검토 포인트</dt>
+              <dd>{mission.planner_review_points}</dd>
+            </div>
+            <div>
+              <dt>개발 메모</dt>
+              <dd>{mission.developer_note}</dd>
+            </div>
           </dl>
 
           <InlineRefineList
@@ -454,7 +462,7 @@ function StepDetail({
         </div>
         {step.body && (
           <div>
-            <dt>본문</dt>
+            <dt>문제/활동 내용</dt>
             <dd>{step.body}</dd>
           </div>
         )}
@@ -465,7 +473,7 @@ function StepDetail({
           </div>
         )}
         <div>
-          <dt>학습자 행동</dt>
+          <dt>문제/활동 수행 방식</dt>
           <dd>{step.learner_action}</dd>
         </div>
         {step.mobile_summary && (

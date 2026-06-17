@@ -718,8 +718,8 @@ function normalizeProject(value, fallbackSubjectName) {
     pc_alternative: asString(rawProject.pc_alternative, 'PC 접근이 어려운 학습자는 모바일에서 의사결정 기준표와 검토 질문 답변으로 대체 제출합니다.'),
     is_student_visible: typeof rawProject.is_student_visible === 'boolean' ? rawProject.is_student_visible : true,
     content_status: normalizeEnum(rawProject.content_status, contentStatuses, 'draft'),
-    planner_note: asString(rawProject.planner_note, '프로젝트 흐름, 모바일 수행성, PC 검증 범위가 적절한지 검토합니다.'),
-    developer_note: asString(rawProject.developer_note, 'project_id를 기준으로 missions, steps, submissions를 연결합니다.'),
+    planner_note: asString(rawProject.planner_note, '기획자 검토 필요: 프로젝트 의도, 모바일 수행성, PC 검증 범위, 평가 가능성, 비식별/가상 데이터 사용 원칙을 확인하세요.'),
+    developer_note: asString(rawProject.developer_note, '개발 참고: project_id를 기준으로 missions, steps, submissions를 연결하고 모바일/PC 표시 방식과 저장 데이터를 매핑하세요.'),
   }
 }
 
@@ -743,8 +743,8 @@ function normalizeMission(value, project, index) {
     estimated_time: asString(rawMission.estimated_time, index >= 2 ? '20~30분' : '15~25분'),
     core_learning_action: asString(rawMission.core_learning_action, '문제 상황 확인, 기준 선택, 산출물 작성'),
     student_outputs: asString(rawMission.student_outputs, '활동 기록과 미션 제출물'),
-    planner_review_points: asString(rawMission.planner_review_points, '학생 노출 문구와 내부 검토 메모가 분리되어 있는지 확인합니다.'),
-    developer_note: asString(rawMission.developer_note, 'mission_id를 기준으로 step과 submission을 저장합니다.'),
+    planner_review_points: asString(rawMission.planner_review_points, '기획자 검토 필요: 미션 의도, 학습자가 헷갈릴 지점, 난이도 조정 포인트, 산출물 평가 기준을 확인하세요.'),
+    developer_note: asString(rawMission.developer_note, '개발 참고: mission_id를 기준으로 step, option, submission 데이터를 저장하고 피어리뷰/제출 흐름과 연결하세요.'),
     mission_overview: asString(rawMission.mission_overview, `${project.title}의 ${index + 1}번째 미션입니다.`),
     learning_goal: asString(rawMission.learning_goal, '실무 문제를 판단 가능한 학습 활동으로 정리합니다.'),
     prerequisites: asString(rawMission.prerequisites, project.prerequisites),
@@ -801,8 +801,8 @@ function normalizeStep(value, projectId, missionId, index) {
     is_student_visible: typeof rawStep.is_student_visible === 'boolean' ? rawStep.is_student_visible : true,
     required_device: deviceTarget,
     completion_rule: asString(rawStep.completion_rule, fallbackCompletionRule(blockType, hasOptions)),
-    planner_note: asString(rawStep.planner_note, '학생에게 보이는 문구와 기대 기준이 분리되어 있는지 확인합니다.'),
-    developer_note: asString(rawStep.developer_note, `step_id ${stepId}를 기준으로 응답과 선택지를 저장합니다.`),
+    planner_note: asString(rawStep.planner_note, '기획자 검토 필요: 이 Step의 기획 의도, 모바일 수행성, 정답/해설 노출 여부, 평가자가 확인할 핵심 기준을 확인하세요.'),
+    developer_note: asString(rawStep.developer_note, `개발 참고: step_id ${stepId}와 block_type을 기준으로 UI 컴포넌트, 사용자 입력 저장값, 자동채점 가능 여부를 매핑하세요.`),
     options,
     body: asNullableString(rawStep.body) || undefined,
     question: asNullableString(rawStep.question) || questionFromBlockType(blockType, rawStep.title),
@@ -1765,6 +1765,51 @@ options는 아래 필드를 우선 사용한다.
 
 ---
 
+[기획자용 내부 검토 메모 작성 기준]
+
+플랫폼에 입력되는 JSON에는 학생에게 보이는 문구와 기획자/개발자 내부 검토 문구가 함께 필요하다.
+이번 작업은 플랫폼 렌더링용 step 구조를 보강하는 것이며, 기획자용 검토 정보를 제거하는 작업이 아니다.
+
+반드시 아래 필드를 유지하고 가능한 한 의미 있게 작성한다.
+
+* project.planner_note
+* project.developer_note
+* missions[].planner_review_points
+* missions[].developer_note
+* missions[].steps[].planner_note
+* missions[].steps[].developer_note
+* missions[].steps[].expected_answer_text
+* missions[].steps[].completion_rule
+* missions[].submission.evaluation_text
+* missions[].submission.pass_criteria
+* validation_checklist[]
+
+학생에게 보이는 문구는 learner_text, body, question, student_instruction, evaluation_text에 작성한다.
+기획자가 콘텐츠를 검토할 때 필요한 주의사항은 planner_note 또는 planner_review_points에 작성한다.
+개발자가 화면 구현, 저장 방식, 평가 처리 방식을 이해하기 위한 내용은 developer_note에 작성한다.
+각 project, mission, step에는 가능한 한 내부 검토 메모를 포함한다.
+
+planner_note에는 다음 내용을 포함한다.
+
+* 이 단계의 기획 의도
+* 학습자가 헷갈릴 수 있는 지점
+* 난이도 조정 시 확인할 점
+* 모바일 수행성 검토 포인트
+* PC 검증이 필요한 이유
+* 평가자가 확인해야 할 핵심 기준
+* 실제 군 데이터나 개인정보를 요구하지 않도록 주의할 점
+
+developer_note에는 다음 내용을 포함한다.
+
+* 추천 UI block 형태
+* 저장해야 할 사용자 입력값
+* 자동채점 가능 여부
+* 정답/해설 노출 여부
+* 모바일/PC 표시 방식
+* 제출 또는 피어리뷰와 연결되는 데이터
+
+---
+
 [생성 기준]
 
 * project, missions, steps, options, submission, ui_blocks, environment_tags, validation_checklist 구조로 생성한다.
@@ -1775,7 +1820,7 @@ options는 아래 필드를 우선 사용한다.
 * 각 미션은 실제 화면에 들어갈 수 있는 학습활동 step 단위로 구성한다.
 * 학생에게 보이는 문구와 내부 검토 메모를 분리한다.
 * 학생 노출 문구는 learner_text, student_instruction, evaluation_text에 작성한다.
-* 내부 검토 문구는 planner_note, developer_note에 작성한다.
+* 내부 검토 문구는 planner_note, planner_review_points, developer_note에 작성하며 절대 생략하지 않는다.
 * 모바일에서는 긴 코드 입력을 요구하지 않는다.
 * 긴 코드 작성은 모바일에서 코드 읽기, 코드 빈칸 채우기, 코드 흐름 순서 배열, 오류 원인 선택, 실행 결과 예측으로 쪼갠 뒤 PC에서 최종 실행/검증하게 한다.
 * PC가 필요한 단계는 block_type을 pc_verification 또는 submission으로 표시하고 required_device/device_target을 pc로 표시한다.
