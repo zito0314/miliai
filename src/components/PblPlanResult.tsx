@@ -12,6 +12,7 @@ import { AnswerGuidePanel } from './AnswerGuidePanel'
 import { InlineTextRefiner } from './InlineTextRefiner'
 import { PblFeedbackPanel } from './PblFeedbackPanel'
 import { PblPlanTable } from './PblPlanTable'
+import { PblPreviewPanel } from './PblPreviewPanel'
 import { RefineResultNotice } from './RefineResultNotice'
 import { SectionRefineButton } from './SectionRefineButton'
 
@@ -186,23 +187,45 @@ export function PblPlanResult({ plan, subjectName, techItems, historyCount, onPl
       />
 
       <Tabs
-        className="workbook-tabs"
-        activeKey={activeTabKey}
-        onChange={setActiveSheetName}
-        items={plan.excelWorkbook.sheets.map((sheet) => ({
-          key: sheet.sheetName,
-          label: getWorkbookTabLabel(sheet.sheetName),
-          children: (
-            <WorkbookSheetPane
-              plan={plan}
-              sheet={sheet}
-              techItems={techItems}
-              answerGuideGeneratingTarget={answerGuideGeneratingTarget}
-              onPlanUpdated={handlePlanUpdated}
-              onGenerateAnswerGuide={handleGenerateAnswerGuide}
-            />
-          ),
-        }))}
+        className="result-view-tabs"
+        defaultActiveKey="learning-preview"
+        items={[
+          {
+            key: 'learning-preview',
+            label: '모바일/PC 미리보기',
+            children: <PblPreviewPanel plan={plan} />,
+          },
+          {
+            key: 'workbook',
+            label: '워크북',
+            children: (
+              <Tabs
+                className="workbook-tabs"
+                activeKey={activeTabKey}
+                onChange={setActiveSheetName}
+                items={plan.excelWorkbook.sheets.map((sheet) => ({
+                  key: sheet.sheetName,
+                  label: getWorkbookTabLabel(sheet.sheetName),
+                  children: (
+                    <WorkbookSheetPane
+                      plan={plan}
+                      sheet={sheet}
+                      techItems={techItems}
+                      answerGuideGeneratingTarget={answerGuideGeneratingTarget}
+                      onPlanUpdated={handlePlanUpdated}
+                      onGenerateAnswerGuide={handleGenerateAnswerGuide}
+                    />
+                  ),
+                }))}
+              />
+            ),
+          },
+          {
+            key: 'json-preview',
+            label: 'JSON 미리보기',
+            children: <JsonPreviewPane plan={plan} />,
+          },
+        ]}
       />
 
       <section className="answer-guide-actions" aria-label="예상 답안 생성">
@@ -225,6 +248,18 @@ export function PblPlanResult({ plan, subjectName, techItems, historyCount, onPl
       {answerGuideError && <Alert className="refine-error-alert" type="error" showIcon message={answerGuideError} />}
 
       <AnswerGuidePanel answerGuides={plan.answerGuides} />
+    </section>
+  )
+}
+
+function JsonPreviewPane({ plan }: { plan: PblPlan }) {
+  return (
+    <section className="json-preview-pane" aria-label="JSON 미리보기">
+      <div>
+        <span>원본 JSON</span>
+        <p>현재 생성 결과를 그대로 확인합니다. 미리보기 변환은 화면 안에서만 적용됩니다.</p>
+      </div>
+      <pre>{JSON.stringify(plan, null, 2)}</pre>
     </section>
   )
 }
