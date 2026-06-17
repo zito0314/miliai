@@ -289,7 +289,6 @@ function PblGenerationHistoryPanel({
             >
               <div className="pbl-history-main">
                 <strong>{record.title}</strong>
-                <span>{record.subjectName}</span>
                 <div className="pbl-history-meta">
                   <span>{formatHistoryDate(record.updatedAt)}</span>
                   <Tag>{record.generationModelName}</Tag>
