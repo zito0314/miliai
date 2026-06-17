@@ -105,11 +105,25 @@ export function PblPlanResult({ plan, subjectName, techItems, historyCount, onPl
   }
 
   return (
-    <section className="pbl-result" aria-label="생성된 JSON-ready PBL 콘텐츠">
+    <section className="pbl-result" aria-label="생성된 PBL 콘텐츠">
       {contextHolder}
+      <PblFeedbackPanel
+        plan={plan}
+        subjectName={subjectName}
+        techItems={techItems}
+        historyCount={historyCount}
+        onUpdated={handlePlanUpdated}
+        onUndo={() => {
+          onUndo()
+          setLastChangeSummary('이전 버전으로 되돌렸습니다.')
+        }}
+      />
+
+      <RefineResultNotice message={lastChangeSummary} />
+
       <div className="pbl-result-toolbar">
         <div className="pbl-result-heading">
-          <span>JSON-ready PBL 콘텐츠</span>
+          <span>생성된 PBL 콘텐츠</span>
           <h2>{plan.project.title}</h2>
         </div>
         <div className="pbl-result-actions">
@@ -124,20 +138,6 @@ export function PblPlanResult({ plan, subjectName, techItems, historyCount, onPl
           </Button>
         </div>
       </div>
-
-      <PblFeedbackPanel
-        plan={plan}
-        subjectName={subjectName}
-        techItems={techItems}
-        historyCount={historyCount}
-        onUpdated={handlePlanUpdated}
-        onUndo={() => {
-          onUndo()
-          setLastChangeSummary('이전 버전으로 되돌렸습니다.')
-        }}
-      />
-
-      <RefineResultNotice message={lastChangeSummary} />
 
       <div className="pbl-summary workbook-summary">
         <div className="pbl-summary-main">
@@ -183,7 +183,7 @@ export function PblPlanResult({ plan, subjectName, techItems, historyCount, onPl
         className="pbl-draft-alert"
         type="info"
         showIcon
-        message="AI가 생성한 JSON-ready PBL 콘텐츠 초안입니다. 학생 노출 문구, 내부 메모, 모바일 수행성, 보안 제약을 검토해주세요."
+        message="AI가 생성한 PBL 콘텐츠 초안입니다. 학생 노출 문구, 내부 메모, 모바일 수행성, 보안 제약을 검토해주세요."
       />
 
       <Tabs

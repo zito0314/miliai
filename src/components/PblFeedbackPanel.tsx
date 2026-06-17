@@ -14,8 +14,6 @@ type PblFeedbackPanelProps = {
   onUndo: () => void
 }
 
-const { TextArea } = Input
-
 export function PblFeedbackPanel({ plan, subjectName, techItems, historyCount, onUpdated, onUndo }: PblFeedbackPanelProps) {
   const [feedback, setFeedback] = useState('')
   const [refining, setRefining] = useState(false)
@@ -51,7 +49,6 @@ export function PblFeedbackPanel({ plan, subjectName, techItems, historyCount, o
     <section className="pbl-feedback-panel" aria-label="PBL 전체 피드백 반영">
       <div className="pbl-feedback-heading">
         <div>
-          <span>피드백 반영</span>
           <h3>생성 결과 전체 조정</h3>
           <p>생성된 PBL 초안에 대한 수정 요청을 입력하면 AI가 반영해 다시 정리합니다.</p>
         </div>
@@ -61,15 +58,15 @@ export function PblFeedbackPanel({ plan, subjectName, techItems, historyCount, o
       </div>
 
       <div className="pbl-feedback-form">
-        <TextArea
+        <Input
           value={feedback}
-          rows={4}
           disabled={refining}
-          placeholder={'예: 미션지를 2개로 줄이고, 전체 난이도를 초급으로 낮춰줘.\n예: 군 행정 업무 맥락이 더 드러나게 수정해줘.'}
+          placeholder="예: 미션지를 2개로 줄이고, 전체 난이도를 초급으로 낮춰줘."
           onChange={(event) => {
             setFeedback(event.target.value)
             if (error) setError(null)
           }}
+          onPressEnter={() => void handleRefine()}
         />
         <Button type="primary" icon={<SendOutlined />} loading={refining} onClick={() => void handleRefine()}>
           {refining ? '피드백 반영 중...' : '피드백 반영하기'}
