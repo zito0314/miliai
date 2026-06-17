@@ -441,27 +441,101 @@ function StepDetail({
       </div>
       <div className="json-step-tags">
         <Tag>{step.section}</Tag>
-        <Tag>{step.input_type}</Tag>
-        <Tag>{step.required_device}</Tag>
         <Tag>{step.block_type}</Tag>
+        <Tag>{step.device_target || step.required_device}</Tag>
+        {step.learning_role && <Tag>{step.learning_role}</Tag>}
+        <Tag>{step.mobile_visible ? '모바일 표시' : '모바일 숨김'}</Tag>
+        <Tag>{step.pc_visible ? 'PC 표시' : 'PC 숨김'}</Tag>
       </div>
       <dl className="json-detail-grid">
         <div>
           <dt>학생 노출 문구</dt>
-          <dd>{step.learner_text}</dd>
+          <dd>{step.learner_text || step.body || '내용 없음'}</dd>
         </div>
+        {step.body && (
+          <div>
+            <dt>본문</dt>
+            <dd>{step.body}</dd>
+          </div>
+        )}
+        {step.question && (
+          <div>
+            <dt>문제 문항</dt>
+            <dd>{step.question}</dd>
+          </div>
+        )}
         <div>
           <dt>학습자 행동</dt>
           <dd>{step.learner_action}</dd>
         </div>
+        {step.mobile_summary && (
+          <div>
+            <dt>모바일 요약</dt>
+            <dd>{step.mobile_summary}</dd>
+          </div>
+        )}
+        {step.pc_detail && (
+          <div>
+            <dt>PC 상세</dt>
+            <dd>{step.pc_detail}</dd>
+          </div>
+        )}
         <div>
           <dt>완료 규칙</dt>
           <dd>{step.completion_rule}</dd>
         </div>
+        {step.correct_answer && (
+          <div>
+            <dt>정답</dt>
+            <dd>{step.correct_answer}</dd>
+          </div>
+        )}
         <div>
           <dt>예상 답안/기대 기준</dt>
           <dd>{step.expected_answer_text || '별도 기준 없음'}</dd>
         </div>
+        {step.explanation && (
+          <div>
+            <dt>해설</dt>
+            <dd>{step.explanation}</dd>
+          </div>
+        )}
+        {step.hint && (
+          <div>
+            <dt>힌트</dt>
+            <dd>{step.hint}</dd>
+          </div>
+        )}
+        {step.expected_output && (
+          <div>
+            <dt>예상 산출물</dt>
+            <dd>{step.expected_output}</dd>
+          </div>
+        )}
+        {step.evaluation_criteria?.length ? (
+          <div>
+            <dt>평가 기준</dt>
+            <dd>{step.evaluation_criteria.join('\n')}</dd>
+          </div>
+        ) : null}
+        {step.checklist_items?.length ? (
+          <div>
+            <dt>체크리스트</dt>
+            <dd>{step.checklist_items.join('\n')}</dd>
+          </div>
+        ) : null}
+        {step.ai_tutor_questions?.length ? (
+          <div>
+            <dt>AI 교관 질문</dt>
+            <dd>{step.ai_tutor_questions.join('\n')}</dd>
+          </div>
+        ) : null}
+        {step.peer_review_points?.length ? (
+          <div>
+            <dt>피어리뷰 포인트</dt>
+            <dd>{step.peer_review_points.join('\n')}</dd>
+          </div>
+        ) : null}
         <div>
           <dt>기획자 검토 메모</dt>
           <dd>{step.planner_note}</dd>
@@ -471,28 +545,62 @@ function StepDetail({
           <dd>{step.developer_note}</dd>
         </div>
       </dl>
+      <StepCodePreview step={step} />
       <InlineRefineList
         plan={plan}
         targets={[
           buildTextTarget(plan, '학생 노출 문구', `missions[${missionIndex}].steps[${stepIndex}].learner_text`),
+          buildTextTarget(plan, '본문', `missions[${missionIndex}].steps[${stepIndex}].body`),
+          buildTextTarget(plan, '문제 문항', `missions[${missionIndex}].steps[${stepIndex}].question`),
           buildTextTarget(plan, '예상 답안/기대 기준', `missions[${missionIndex}].steps[${stepIndex}].expected_answer_text`),
+          buildTextTarget(plan, '해설', `missions[${missionIndex}].steps[${stepIndex}].explanation`),
+          buildTextTarget(plan, '힌트', `missions[${missionIndex}].steps[${stepIndex}].hint`),
           buildTextTarget(plan, '기획자 검토 메모', `missions[${missionIndex}].steps[${stepIndex}].planner_note`),
         ].filter(Boolean) as TextRefineTarget[]}
         onPlanUpdated={onPlanUpdated}
       />
       {step.options.length > 0 && (
         <div className="json-option-list">
-          <strong>선택지</strong>
-          <div>
+          <strong>선택지 내부 검토</strong>
+          <div className="json-option-review-list">
             {step.options.map((option) => (
-              <Tag key={`${mission.mission_id}-${step.step_id}-${option.option_order}`}>
-                {option.option_label}{option.is_expected ? ' · 기대값' : ''}
-              </Tag>
+              <div className="json-option-review-item" key={`${mission.mission_id}-${step.step_id}-${option.option_order}`}>
+                <div>
+                  <Tag color={option.is_correct || option.is_expected ? 'success' : 'default'}>
+                    {option.is_correct || option.is_expected ? '정답' : '오답'}
+                  </Tag>
+                  <strong>{option.label || option.option_label}</strong>
+                  {option.expected_order !== null && option.expected_order !== undefined && <span>순서 {option.expected_order}</span>}
+                </div>
+                {option.explanation && <p>{option.explanation}</p>}
+              </div>
             ))}
           </div>
         </div>
       )}
     </article>
+  )
+}
+
+function StepCodePreview({ step }: { step: Step }) {
+  const codeBlocks = [
+    step.code ? { label: '코드', value: step.code } : null,
+    step.code_template ? { label: '코드 템플릿', value: step.code_template } : null,
+    step.buggy_code ? { label: '오류 코드', value: step.buggy_code } : null,
+    ...(step.code_blocks || []).map((block) => ({ label: block.id, value: block.content })),
+  ].filter(Boolean) as { label: string; value: string }[]
+
+  if (!codeBlocks.length) return null
+
+  return (
+    <div className="json-code-preview-list">
+      {codeBlocks.map((block) => (
+        <div className="json-code-preview" key={block.label}>
+          <span>{block.label}</span>
+          <pre>{block.value}</pre>
+        </div>
+      ))}
+    </div>
   )
 }
 

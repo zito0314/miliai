@@ -1,5 +1,23 @@
 export type ContentStatus = 'draft' | 'draft_ready_for_test' | 'review_needed' | 'approved'
-export type RequiredDevice = 'mobile' | 'pc' | 'both'
+export type PblBlockType =
+  | 'situation_card'
+  | 'concept_card'
+  | 'vod_recommendation'
+  | 'single_choice'
+  | 'multiple_choice'
+  | 'sequence_order'
+  | 'code_block'
+  | 'code_fill_blank'
+  | 'code_error_finding'
+  | 'result_prediction'
+  | 'ai_tutor_question'
+  | 'self_checklist'
+  | 'peer_review_request'
+  | 'pc_verification'
+  | 'submission'
+export type DeviceTarget = 'mobile' | 'pc' | 'both'
+export type RequiredDevice = DeviceTarget
+export type LearningRole = 'understand' | 'decide' | 'assemble' | 'review' | 'execute' | 'submit'
 export type ValidationStatus = '검토 필요' | '통과' | '보완 필요'
 
 export type PblPlan = {
@@ -61,7 +79,7 @@ export type Step = {
   step_id: string
   step_order: number
   section: string
-  block_type: string
+  block_type: PblBlockType | string
   title: string
   learner_text: string
   learner_action: string
@@ -75,18 +93,57 @@ export type Step = {
   planner_note: string
   developer_note: string
   options: StepOption[]
+  body?: string
+  question?: string
+  code?: string
+  code_template?: string
+  buggy_code?: string
+  correct_answer?: string
+  hint?: string
+  explanation?: string
+  code_blocks?: CodeBlock[]
+  correct_order?: string[]
+  checklist_items?: string[]
+  ai_tutor_questions?: string[]
+  peer_review_points?: string[]
+  is_required?: boolean
+  device?: DeviceTarget
+  device_target?: DeviceTarget
+  mobile_visible?: boolean
+  pc_visible?: boolean
+  mobile_variant?: string
+  pc_variant?: string
+  learning_role?: LearningRole
+  mobile_summary?: string
+  pc_detail?: string
+  mobile_continue_label?: string
+  pc_continue_label?: string
+  submission_type?: string[]
+  evaluation_criteria?: string[]
+  expected_output?: string
 }
 
 export type StepOption = {
   project_id: string
   mission_id: string
   step_id: string
+  option_id?: string
   option_order: number
   option_value: string
   option_label: string
+  label?: string
+  is_correct?: boolean
   is_expected: boolean
+  explanation?: string
   expected_order: number | null
   option_group: string
+  order?: number
+}
+
+export type CodeBlock = {
+  id: string
+  content: string
+  order?: number
 }
 
 export type Submission = {

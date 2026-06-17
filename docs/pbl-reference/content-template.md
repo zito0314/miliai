@@ -142,6 +142,29 @@ type Step = {
   expected_answer_text: string | null;
   is_student_visible: boolean;
   required_device: "mobile" | "pc" | "both";
+  device_target?: "mobile" | "pc" | "both";
+  device?: "mobile" | "pc" | "both";
+  mobile_visible?: boolean;
+  pc_visible?: boolean;
+  learning_role?: "understand" | "decide" | "assemble" | "review" | "execute" | "submit";
+  body?: string;
+  question?: string;
+  code?: string;
+  code_template?: string;
+  buggy_code?: string;
+  correct_answer?: string;
+  hint?: string;
+  explanation?: string;
+  correct_order?: string[];
+  checklist_items?: string[];
+  ai_tutor_questions?: string[];
+  peer_review_points?: string[];
+  mobile_summary?: string;
+  pc_detail?: string;
+  mobile_continue_label?: string;
+  pc_continue_label?: string;
+  evaluation_criteria?: string[];
+  expected_output?: string;
   completion_rule: string;
   planner_note: string;
   developer_note: string;
@@ -167,6 +190,9 @@ type Step = {
 - `expected_answer_text`는 기획자와 평가자가 확인할 수 있는 예상 답안 또는 기대 기준이다.
 - `is_student_visible`은 학생 화면 노출 여부다.
 - `required_device`는 `mobile`, `pc`, `both` 중 하나다.
+- `device_target`, `device`, `required_device`는 가능한 한 같은 값으로 맞춘다.
+- `learning_role`은 이해, 판단, 조립, 검토, 실행, 제출 중 step의 역할을 표시한다.
+- `mobile_visible`, `pc_visible`은 플랫폼 화면 표시 분기 기준이다.
 - `completion_rule`은 완료 판정 기준이다.
 - `planner_note`는 기획자 내부 검토용이다.
 - `developer_note`는 UI 컴포넌트, 데이터 저장 방식 참고용이다.
@@ -179,29 +205,21 @@ type Step = {
 ### 권장 block_type
 
 ```text
-mission_overview
-learning_goal
-prerequisite_courses
-tech_stack
-constraints
-scenario_intro
-scenario_card
+situation_card
+concept_card
+vod_recommendation
 single_choice
-multi_choice
-matching
-sequence_sort
-fill_blank
-short_text
-content
-checklist
-ai_tutor_prompt
-pc_execution
-file_upload
-comparison
+multiple_choice
+sequence_order
+code_block
+code_fill_blank
+code_error_finding
+result_prediction
+ai_tutor_question
+self_checklist
 peer_review_request
-peer_review
+pc_verification
 submission
-evaluation
 ```
 
 ### 권장 input_type
@@ -209,26 +227,32 @@ evaluation
 ```text
 read
 single_choice
-multi_choice
-matching
-sequence_sort
-fill_blank
+multiple_choice
+sequence_order
+code_fill_blank
+code_error_finding
+result_prediction
 short_text
-checklist
-ai_tutor
-pc_execution
-file_upload
-compare
+self_checklist
+ai_tutor_question
+pc_verification
 peer_review_request
-peer_review
 submit
 ```
+
+### legacy 값 변환
+
+- `multi_choice` → `multiple_choice`
+- `sequence_sort` → `sequence_order`
+- `fill_blank` → `code_fill_blank`
+- `ai_tutor_prompt` → `ai_tutor_question`
+- `pc_execution` → `pc_verification`
 
 ### 모바일/PC 기준
 
 - 모바일에서는 긴 코드 입력을 요구하지 않는다.
-- 모바일 step은 선택형, 매칭형, 순서 배열, 짧은 서술, 체크리스트, AI 교관 질문, 피어리뷰 중심으로 구성한다.
-- 긴 코드 작성이나 실제 실행은 `required_device: "pc"` 또는 `input_type: "pc_execution"`으로 분리한다.
+- 모바일 step은 상황 이해, 선택, 판단, 순서 배열, 코드 읽기, 코드 빈칸 채우기, 오류 찾기, 결과 예측, 체크리스트, AI 교관 질문, 피어리뷰 중심으로 구성한다.
+- 긴 코드 작성이나 실제 실행은 `required_device: "pc"` 및 `block_type: "pc_verification"`으로 분리한다.
 - PC가 필요한 경우 가능하면 모바일 대체 과제를 제공한다.
 
 ---
@@ -242,12 +266,17 @@ type StepOption = {
   project_id: string;
   mission_id: string;
   step_id: string;
+  option_id?: string;
   option_order: number;
   option_value: string;
   option_label: string;
+  label?: string;
+  is_correct?: boolean;
   is_expected: boolean;
+  explanation?: string;
   expected_order: number | null;
   option_group: string;
+  order?: number;
 };
 ```
 
@@ -255,9 +284,11 @@ type StepOption = {
 
 - `option_value`는 영문 또는 한글 slug 형태로 작성한다.
 - `option_label`은 학생에게 보이는 문구다.
-- 정답 또는 기대값이 있는 경우 `is_expected: true`로 표시한다.
+- `label`은 학습 플랫폼 표시용 선택지 문구이며, 없으면 `option_label`과 같게 작성한다.
+- 정답 또는 기대값이 있는 경우 `is_correct: true`, `is_expected: true`로 표시한다.
+- 오답 선택지도 `explanation`에 왜 오답인지 작성한다.
 - 정답이 없는 의견형/체크리스트형 항목은 `is_expected: false`로 둔다.
-- 순서 배열형은 `expected_order`를 1부터 작성한다.
+- 순서 배열형은 `expected_order` 또는 `order`를 1부터 작성한다.
 - 순서가 없는 선택형은 `expected_order`를 `null`로 둔다.
 - `option_group`은 해당 step의 `input_type`과 맞춘다.
 
@@ -316,15 +347,19 @@ type UiBlockDictionaryItem = {
 
 권장 기본 항목:
 
-- `scenario_card`
-- `single_or_multi_choice`
-- `matching`
-- `sequence_sort`
-- `fill_blank`
-- `ai_tutor_prompt`
-- `checklist`
-- `file_or_text_submission`
-- `peer_review`
+- `situation_card`
+- `concept_card`
+- `single_choice`
+- `multiple_choice`
+- `sequence_order`
+- `code_fill_blank`
+- `code_error_finding`
+- `result_prediction`
+- `ai_tutor_question`
+- `self_checklist`
+- `peer_review_request`
+- `pc_verification`
+- `submission`
 
 ---
 

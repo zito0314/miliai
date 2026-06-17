@@ -76,7 +76,7 @@ PC가 필요한 활동:
 - 대시보드 또는 간단한 웹앱 확인
 - 최종 산출물 정리
 
-PC가 필요한 경우 `required_device`를 `pc`로 표시한다.
+PC가 필요한 경우 `required_device`와 `device_target`을 `pc`로 표시하고, 실행/검증 활동은 `pc_verification` block_type을 사용한다.
 PC 없이도 수행할 수 있는 대체 활동이 있으면 `pc_alternative` 또는 별도 step으로 제공한다.
 
 ---
@@ -240,7 +240,7 @@ AI 교관 step에서 적합한 활동:
 - 학습자가 이해하지 못한 결과를 그대로 제출하게 하기
 - 실제 군 내부 데이터나 개인정보를 입력하게 하기
 
-AI 교관 관련 step에는 가능한 한 `ai_tutor_prompt` block_type을 사용한다.
+AI 교관 관련 step에는 가능한 한 `ai_tutor_question` block_type을 사용한다.
 
 ---
 
@@ -255,7 +255,7 @@ AI 교관 관련 step에는 가능한 한 `ai_tutor_prompt` block_type을 사용
 - 성공 기준이 판단 가능한 형태인가?
 - 어떤 부분을 보완하면 더 좋아지는가?
 
-피어리뷰 step은 `peer_review_request` 또는 `peer_review`를 사용한다.
+피어리뷰 step은 `peer_review_request`를 사용한다.
 
 ---
 
@@ -324,6 +324,6 @@ AI 교관 관련 step에는 가능한 한 `ai_tutor_prompt` block_type을 사용
 - 개인정보 또는 민감정보 입력을 요구하는 콘텐츠
 - 평가 기준이 추상적인 콘텐츠
 - 정답이 없는 활동인데 정답을 하나로 단정하는 콘텐츠
-- PC가 필요한데 required_device를 mobile로 표시하는 콘텐츠
+- PC가 필요한데 required_device 또는 device_target을 mobile로 표시하는 콘텐츠
 - 학생 노출 문구와 내부 메모가 섞인 콘텐츠
 - 스키마에 없는 필드를 임의로 추가한 콘텐츠

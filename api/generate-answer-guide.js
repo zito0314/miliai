@@ -220,13 +220,18 @@ function buildAnswerGuidePrompt({ currentPlan, targetMissions, techContext }) {
 2. 새 미션이나 새 프로젝트를 만들지 않는다.
 3. 제공된 missions와 steps를 기준으로만 예상 답안을 작성한다.
 4. 학습자에게 그대로 공개할 정답지가 아니라 기획자용 참고 자료로 작성한다.
-5. expected_answer_text, options[].is_expected, submission.pass_criteria를 우선 참고한다.
+5. block_type, device_target, learning_role, question, options, correct_answer, expected_answer_text, explanation, hint, code, code_template, buggy_code, correct_order, checklist_items, peer_review_points, ai_tutor_questions, submission.pass_criteria를 우선 참고한다.
 6. 코드가 필요한 경우에만 codeExamples를 작성한다.
 7. 코드가 필요 없는 문서형/토론형/문제정의형 미션이면 codeExamples는 빈 배열로 둔다.
 8. 코드 예시는 가능한 짧고 실행 가능한 참고 코드 조각으로 작성한다.
 9. 모든 평가 예시는 mission.submission.pass_criteria와 연결되어야 한다.
 10. 군 장병 대상 AI 활용 교육 수준에 맞게 과도한 고급 구현은 피한다.
 11. 스마트폰/태블릿 기반 학습 환경을 고려해 지나치게 긴 코드나 복잡한 환경 설정은 피한다.
+12. answerGuides는 원본 missions[].steps[]를 변경하지 않는다.
+13. options[].is_correct와 options[].is_expected가 있으면 정답 판단의 1순위 근거로 사용한다.
+14. code_fill_blank, code_error_finding, result_prediction은 코드 예시와 해설을 우선 생성한다.
+15. situation_card, concept_card는 정답보다 검토 포인트와 예상 응답 중심으로 작성한다.
+16. pc_verification, submission은 제출물 검토 기준과 PASS/FAIL 예시 중심으로 작성한다.
 
 [현재 PBL 계획]
 ${stringifyForPrompt(stripExcelWorkbook(currentPlan))}

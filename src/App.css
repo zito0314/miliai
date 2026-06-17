@@ -916,6 +916,75 @@
   padding-top: 12px;
 }
 
+.json-option-review-list,
+.json-code-preview-list {
+  display: grid;
+  gap: 8px;
+}
+
+.json-option-review-item {
+  border: 1px solid #e5ebe8;
+  border-radius: 8px;
+  padding: 9px 10px;
+  background: #f8faf9;
+}
+
+.json-option-review-item > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.json-option-review-item strong {
+  color: #273631;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.json-option-review-item span {
+  color: #687772;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.json-option-review-item p {
+  margin: 6px 0 0;
+  color: #586762;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.json-code-preview-list {
+  margin: 12px 0;
+}
+
+.json-code-preview {
+  min-width: 0;
+}
+
+.json-code-preview span {
+  display: inline-block;
+  margin-bottom: 5px;
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.json-code-preview pre {
+  overflow: auto;
+  max-height: 280px;
+  margin: 0;
+  border: 1px solid #dbe5e1;
+  border-radius: 8px;
+  padding: 12px;
+  background: #f5f8f7;
+  color: #1f2d29;
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
 .json-checklist-card strong {
   display: block;
   margin-top: 4px;

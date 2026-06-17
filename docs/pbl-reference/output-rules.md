@@ -196,33 +196,31 @@ both
 `block_type`은 아래 값을 우선 사용한다.
 
 ```text
-mission_overview
-learning_goal
-prerequisite_courses
-tech_stack
-constraints
-scenario_intro
-scenario_card
+situation_card
+concept_card
+vod_recommendation
 single_choice
-multi_choice
-matching
-sequence_sort
-fill_blank
-short_text
-content
-checklist
-ai_tutor_prompt
-pc_execution
-file_upload
-comparison
+multiple_choice
+sequence_order
+code_block
+code_fill_blank
+code_error_finding
+result_prediction
+ai_tutor_question
+self_checklist
 peer_review_request
-peer_review
+pc_verification
 submission
-evaluation
 ```
 
 스키마에 없는 값을 임의로 만들지 않는다.
-필요한 경우 가장 가까운 기존 값을 사용한다.
+legacy 값이 필요한 경우 아래처럼 변환한다.
+
+- `multi_choice` → `multiple_choice`
+- `sequence_sort` → `sequence_order`
+- `fill_blank` → `code_fill_blank`
+- `ai_tutor_prompt` → `ai_tutor_question`
+- `pc_execution` → `pc_verification`
 
 ---
 
@@ -233,18 +231,16 @@ evaluation
 ```text
 read
 single_choice
-multi_choice
-matching
-sequence_sort
-fill_blank
+multiple_choice
+sequence_order
+code_fill_blank
+code_error_finding
+result_prediction
 short_text
-checklist
-ai_tutor
-pc_execution
-file_upload
-compare
+self_checklist
+ai_tutor_question
+pc_verification
 peer_review_request
-peer_review
 submit
 ```
 
@@ -252,7 +248,7 @@ submit
 
 ## 8. options 규칙
 
-선택형, 매칭형, 순서 배열형, 체크리스트형 step에는 `options`를 작성한다.
+선택형, 순서 배열형, 코드 빈칸 채우기, 오류 찾기, 결과 예측, 체크리스트형 step에는 `options`를 작성한다.
 선택지가 없는 step은 `options: []`로 둔다.
 
 ```json
@@ -260,12 +256,17 @@ submit
   "project_id": "PBL-SAMPLE-001",
   "mission_id": "M01",
   "step_id": "M01-S001",
+  "option_id": "M01-S001-OPT-001",
   "option_order": 1,
   "option_value": "option_1",
   "option_label": "학생에게 보이는 선택지",
+  "label": "학생에게 보이는 선택지",
+  "is_correct": true,
   "is_expected": true,
+  "explanation": "이 선택지가 정답인 이유",
   "expected_order": null,
-  "option_group": "single_choice"
+  "option_group": "single_choice",
+  "order": 1
 }
 ```
 
@@ -291,7 +292,7 @@ submit
 
 ### expected_order 규칙
 
-- `sequence_sort` 유형에서는 정답 순서를 1부터 작성한다.
+- `sequence_order` 유형에서는 정답 순서를 1부터 작성한다.
 - 그 외 유형에서는 `expected_order: null`로 둔다.
 
 ---
@@ -332,7 +333,7 @@ submit
 
 ```json
 {
-  "ui_block_type": "scenario_card",
+  "ui_block_type": "situation_card",
   "content_unit": "상황 카드",
   "purpose": "학생에게 문제 상황을 짧게 제시한다.",
   "screen_elements": "제목, 설명, 선택 버튼",
@@ -348,15 +349,19 @@ submit
 권장 항목:
 
 ```text
-scenario_card
-single_or_multi_choice
-matching
-sequence_sort
-fill_blank
-ai_tutor_prompt
-checklist
-file_or_text_submission
-peer_review
+situation_card
+concept_card
+single_choice
+multiple_choice
+sequence_order
+code_fill_blank
+code_error_finding
+result_prediction
+ai_tutor_question
+self_checklist
+peer_review_request
+pc_verification
+submission
 ```
 
 ---
@@ -477,8 +482,9 @@ PC 실행 step:
 ```json
 {
   "required_device": "pc",
-  "input_type": "pc_execution",
-  "block_type": "pc_execution"
+  "device_target": "pc",
+  "input_type": "pc_verification",
+  "block_type": "pc_verification"
 }
 ```
 
