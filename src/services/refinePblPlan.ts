@@ -39,7 +39,7 @@ function buildRequestBody(params: RefinePblPlanParams) {
       targetPath: params.targetPath,
       targetType: params.targetType,
       targetData: params.targetData,
-      techContext: buildTechContext(params.currentPlan.subjectName, params.techItems),
+      techContext: buildTechContext(params.currentPlan.project.title, params.techItems),
       feedback: params.feedback,
     }
   }

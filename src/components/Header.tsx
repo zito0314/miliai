@@ -9,7 +9,7 @@ export function Header() {
             <BookOutlined />
           </span>
           <div>
-            <strong>Mili AI PBL 기술 검색</strong>
+            <strong>MiliAI 콘텐츠 생성기</strong>
             <p>프로젝트 주제와 연결되는 기술·Unit 후보를 빠르게 찾아보세요.</p>
           </div>
         </div>

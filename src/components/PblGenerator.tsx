@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { BulbOutlined, DeleteOutlined, FolderOpenOutlined, HistoryOutlined, ThunderboltOutlined } from '@ant-design/icons'
+import { DeleteOutlined, FolderOpenOutlined, HistoryOutlined, ThunderboltOutlined } from '@ant-design/icons'
 import { Alert, Button, Input, Select, Tag } from 'antd'
 import {
   DEFAULT_GENERATION_MODEL_ID,
@@ -175,7 +175,6 @@ export function PblGenerator({ techItems, isTechItemsLoading }: PblGeneratorProp
     <section className="pbl-generator-section">
       <div className="pbl-generator-inner">
         <div className="pbl-generator-heading">
-          <span className="pbl-generator-icon" aria-hidden="true"><BulbOutlined /></span>
           <div>
             <span>AI 과정설계 도구</span>
             <h2>PBL 과정 자동 생성</h2>
@@ -235,7 +234,7 @@ export function PblGenerator({ techItems, isTechItemsLoading }: PblGeneratorProp
         {plan && (
           <PblPlanResult
             plan={plan}
-            subjectName={subjectName.trim() || plan.subjectName}
+            subjectName={subjectName.trim() || plan.project.title}
             techItems={techItems}
             historyCount={planHistory.length}
             onPlanUpdated={handlePlanUpdated}
@@ -294,7 +293,7 @@ function PblGenerationHistoryPanel({
                 <div className="pbl-history-meta">
                   <span>{formatHistoryDate(record.updatedAt)}</span>
                   <Tag>{record.generationModelName}</Tag>
-                  <Tag>{record.plan.missionSheetCount}개 미션</Tag>
+                  <Tag>{record.plan.missions.length}개 미션</Tag>
                   {record.id === activeHistoryId && <Tag color="green">열림</Tag>}
                 </div>
               </div>

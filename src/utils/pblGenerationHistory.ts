@@ -34,7 +34,7 @@ export function createPblGenerationHistoryRecord(
   const now = new Date().toISOString()
   return {
     id: createRecordId(),
-    subjectName: plan.subjectName,
+    subjectName: getPlanSubjectName(plan),
     title: getPlanTitle(plan),
     generationModel,
     generationModelName: getGenerationModelName(generationModel),
@@ -72,7 +72,7 @@ export function upsertPblGenerationHistoryRecord(
     {
       ...nextRecord,
       title: getPlanTitle(nextRecord.plan),
-      subjectName: nextRecord.plan.subjectName,
+      subjectName: getPlanSubjectName(nextRecord.plan),
       generationModelName: getGenerationModelName(nextRecord.generationModel),
     },
     ...records.filter((record) => record.id !== nextRecord.id),
@@ -89,7 +89,7 @@ export function updatePblGenerationHistoryRecord(
     record.id === recordId
       ? {
           ...record,
-          subjectName: plan.subjectName,
+          subjectName: getPlanSubjectName(plan),
           title: getPlanTitle(plan),
           updatedAt: now,
           plan,
@@ -130,7 +130,7 @@ function normalizeHistoryRecord(value: unknown): PblGenerationHistoryRecord | nu
     const generationModel = normalizeGenerationModel(rawRecord.generationModel)
     return {
       id: rawRecord.id,
-      subjectName: plan.subjectName,
+      subjectName: getPlanSubjectName(plan),
       title: getPlanTitle(plan),
       generationModel,
       generationModelName: getGenerationModelName(generationModel),
@@ -154,7 +154,11 @@ function getGenerationModelName(generationModel: GenerationModelId) {
 }
 
 function getPlanTitle(plan: PblPlan) {
-  return plan.projectOverview.projectTitle || plan.subjectName || 'PBL 과정설계'
+  return plan.project.title || 'PBL 과정설계'
+}
+
+function getPlanSubjectName(plan: PblPlan) {
+  return plan.project.title || 'PBL 과정설계'
 }
 
 function sortByUpdatedAtDesc(a: PblGenerationHistoryRecord, b: PblGenerationHistoryRecord) {
