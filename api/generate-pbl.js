@@ -413,12 +413,23 @@ function resolveGenerationModel(value) {
 
 async function generateWithGemini({ apiKey, model, prompt, referenceUrls }) {
   const ai = new GoogleGenAI({ apiKey })
-  const { result, usedFallback } = await generateContentWithUrlContextFallback(ai, {
+  const { prompt: geminiPrompt, failedUrls } = await appendFetchedReferenceContent(prompt, referenceUrls)
+  console.info('PBL generation reference URLs', referenceUrls)
+
+  if (failedUrls.length) {
+    console.warn('PBL generation reference document fetch failed.', { failedUrls })
+  }
+
+  const result = await ai.models.generateContent({
     model,
-    prompt,
-    referenceUrls,
+    contents: [geminiPrompt],
+    config: {
+      temperature: 0.35,
+      maxOutputTokens: 30000,
+      responseMimeType: 'application/json',
+      responseJsonSchema: geminiResponseJsonSchema,
+    },
   })
-  logUrlContextMetadata(result, referenceUrls)
 
   if (!result.text) {
     throw new Error('Gemini가 빈 응답을 반환했습니다.')
@@ -426,7 +437,7 @@ async function generateWithGemini({ apiKey, model, prompt, referenceUrls }) {
 
   return {
     text: result.text,
-    warning: usedFallback || hasUrlContextFailure(result)
+    warning: failedUrls.length
       ? '기준 문서 URL을 일부 확인하지 못했지만, 기본 생성 규칙으로 PBL 초안을 생성했어요.'
       : null,
   }
@@ -495,71 +506,38 @@ async function appendFetchedReferenceContent(prompt, referenceUrls) {
   )
   const failedUrls = entries.filter((entry) => !entry.text).map((entry) => entry.url)
   const referenceContent = entries
-    .map((entry) => `## ${entry.label}\nURL: ${entry.url}\n${entry.text || 'URL 내용을 가져오지 못했습니다.'}`)
+    .map((entry) => `## ${getReferenceDocumentLabel(entry.label)}\nURL: ${entry.url}\n${entry.text || 'URL 내용을 가져오지 못했습니다.'}`)
     .join('\n\n')
 
   return {
-    prompt: `${prompt}\n\n---\n\n[서버가 사전 조회한 URL 컨텍스트 내용]\n${referenceContent}`,
+    prompt: `${prompt}\n\n---\n\n[서버가 사전 조회한 기준 문서 본문]\n${referenceContent}`,
     failedUrls,
   }
 }
 
 async function fetchReferenceText(url) {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 8000)
+
   try {
     const referenceResponse = await fetch(url, {
       headers: { Accept: 'text/plain, text/markdown, */*' },
+      signal: controller.signal,
     })
     if (!referenceResponse.ok) return ''
     return (await referenceResponse.text()).slice(0, 12000)
   } catch {
     return ''
+  } finally {
+    clearTimeout(timeoutId)
   }
 }
 
-async function generateContentWithUrlContextFallback(ai, { model, prompt, referenceUrls }) {
-  const baseConfig = {
-    temperature: 0.35,
-    maxOutputTokens: 30000,
-    responseMimeType: 'application/json',
-    responseJsonSchema: geminiResponseJsonSchema,
-  }
-
-  try {
-    console.info('PBL generation reference URLs', referenceUrls)
-    const result = await ai.models.generateContent({
-      model,
-      contents: [prompt],
-      config: {
-        ...baseConfig,
-        tools: [{ urlContext: {} }],
-      },
-    })
-    return { result, usedFallback: false }
-  } catch (error) {
-    if (!isUrlContextFailure(error)) throw error
-
-    console.warn('Gemini URL Context failed. Retrying PBL generation without URL Context Tool.', {
-      urls: referenceUrls,
-      message: error instanceof Error ? error.message : String(error),
-    })
-    const result = await ai.models.generateContent({
-      model,
-      contents: [prompt],
-      config: baseConfig,
-    })
-    return { result, usedFallback: true }
-  }
-}
-
-function isUrlContextFailure(error) {
-  const status = Number(error?.status || error?.code || error?.error?.code)
-  const message = typeof error?.message === 'string' ? error.message.toLowerCase() : ''
-  return status === 400 && (
-    message.includes('urlcontext')
-    || message.includes('url context')
-    || message.includes('url_context')
-    || message.includes('tool')
-  )
+function getReferenceDocumentLabel(label) {
+  if (label === 'templateUrl') return '생성해야 할 콘텐츠 템플릿'
+  if (label === 'guidelineUrl') return '콘텐츠 생성 시 유의사항'
+  if (label === 'outputRuleUrl') return '출력해야 할 규칙'
+  return label
 }
 
 function normalizeReferenceUrls(value) {
@@ -582,62 +560,6 @@ function normalizeRawGithubUrl(value, fallback) {
   }
 
   return fallback
-}
-
-function logUrlContextMetadata(result, referenceUrls) {
-  const metadata = collectUrlContextMetadata(result)
-  console.info('PBL generation URL Context summary', {
-    referenceUrls,
-    metadata: metadata.length ? metadata.map((item) => ({ key: item.key, value: compactLogValue(item.value) })) : 'No URL Context metadata returned by SDK.',
-  })
-}
-
-function collectUrlContextMetadata(value, depth = 0) {
-  if (!value || typeof value !== 'object' || depth > 5) return []
-
-  const entries = []
-  for (const [key, nestedValue] of Object.entries(value)) {
-    const normalizedKey = key.toLowerCase()
-    if (normalizedKey.includes('urlcontext') || normalizedKey.includes('url_context')) {
-      entries.push({ key, value: nestedValue })
-      continue
-    }
-    if (nestedValue && typeof nestedValue === 'object') {
-      entries.push(...collectUrlContextMetadata(nestedValue, depth + 1))
-    }
-  }
-
-  return entries.slice(0, 20)
-}
-
-function hasUrlContextFailure(result) {
-  const metadata = collectUrlContextMetadata(result)
-  const serializedMetadata = safeStringify(metadata).toLowerCase()
-
-  if (!metadata.length) return false
-  return serializedMetadata.includes('failed')
-    || serializedMetadata.includes('error')
-    || serializedMetadata.includes('unreachable')
-}
-
-function compactLogValue(value) {
-  const serialized = safeStringify(value)
-  return serialized.length > 2000 ? `${serialized.slice(0, 2000)}...` : serialized
-}
-
-function safeStringify(value) {
-  const seen = new WeakSet()
-  try {
-    return JSON.stringify(value, (_, nestedValue) => {
-      if (nestedValue && typeof nestedValue === 'object') {
-        if (seen.has(nestedValue)) return '[Circular]'
-        seen.add(nestedValue)
-      }
-      return nestedValue
-    })
-  } catch {
-    return String(value)
-  }
 }
 
 export function validatePlanConsistency(plan) {
@@ -1649,10 +1571,11 @@ ${techContext || '별도 기술 컨텍스트 없음'}
 
 ---
 
-[URL 컨텍스트 자료]
+[기준 문서 URL]
 
 아래 URL들은 콘텐츠 생성 기준 문서다.
-반드시 URL Context를 통해 내용을 확인한 뒤 생성에 반영한다.
+서버가 GitHub raw 문서 본문을 직접 조회해 이 프롬프트 하단의 [서버가 사전 조회한 기준 문서 본문] 섹션에 첨부한다.
+첨부된 문서 본문을 확인한 뒤 생성에 반영한다.
 
 1. 생성해야 할 콘텐츠 템플릿
    ${referenceUrls.templateUrl}
@@ -1665,7 +1588,7 @@ ${techContext || '별도 기술 컨텍스트 없음'}
 
 ---
 
-[URL 자료 활용 우선순위]
+[기준 문서 활용 우선순위]
 
 아래 우선순위에 따라 생성 기준을 적용한다.
 
@@ -1946,10 +1869,10 @@ developer_note에는 다음 내용을 포함한다.
 
 ---
 
-[URL Context 실패 시 처리]
+[기준 문서 조회 실패 시 처리]
 
-URL Context 자료 일부를 확인하지 못하더라도 생성 자체를 중단하지 않는다.
-URL 확인에 실패한 경우에도 기존 JSON-ready PBL 구조와 서버 Zod Schema 기준으로 생성한다.
+기준 문서 일부를 확인하지 못하더라도 생성 자체를 중단하지 않는다.
+문서 조회에 실패한 경우에도 기존 JSON-ready PBL 구조와 서버 Zod Schema 기준으로 생성한다.
 임의의 새 구조를 만들지 않는다.
 
 ---
@@ -1968,9 +1891,9 @@ ID, 순서, 누락 필드, options_ref, expected_answer_ref, workbook 변환은 
 
 반환 전 아래 기준을 스스로 확인하고, 문제가 있으면 수정한 뒤 JSON만 반환한다.
 
-* URL 문서의 출력 규칙을 우선 반영했는가
-* URL 문서의 콘텐츠 템플릿 구조를 따랐는가
-* URL 문서의 유의사항을 반영했는가
+* 첨부된 기준 문서의 출력 규칙을 우선 반영했는가
+* 첨부된 기준 문서의 콘텐츠 템플릿 구조를 따랐는가
+* 첨부된 기준 문서의 유의사항을 반영했는가
 * project, missions, steps, options, submission 구조가 있는가
 * 학생 노출 문구와 내부 메모가 분리되어 있는가
 * 모바일 수행성과 PC 검증 여부가 표시되어 있는가
