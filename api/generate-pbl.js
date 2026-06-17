@@ -232,11 +232,11 @@ export const pblPlanSchema = pblContentSchema.extend({
 })
 
 const defaultGeminiModel = 'gemini-2.5-flash'
-const defaultGroqModel = 'openai/gpt-oss-120b'
+const defaultGroqModel = 'llama-3.3-70b-versatile'
 const defaultGroqMaxCompletionTokens = 4500
 const groqTechContextMaxChars = 3500
 const defaultGenerationModelId = 'gemini-2.5-flash'
-const generationModelSchema = z.enum(['gemini-2.5-flash', 'groq-gpt-oss-120b'])
+const generationModelSchema = z.enum(['gemini-2.5-flash', 'groq-llama-3.3-70b-versatile'])
 
 const responseJsonSchema = z.toJSONSchema(pblContentSchema, { target: 'draft-7' })
 delete responseJsonSchema.$schema
@@ -394,12 +394,12 @@ export default async function handler(request, response) {
 
 function resolveGenerationModel(value) {
   const selectedModelId = generationModelSchema.safeParse(value).success ? value : defaultGenerationModelId
-  if (selectedModelId === 'groq-gpt-oss-120b') {
+  if (selectedModelId === 'groq-llama-3.3-70b-versatile') {
     return {
       id: selectedModelId,
       provider: 'groq',
       providerLabel: 'Groq',
-      model: process.env.GROQ_MODEL?.trim() || defaultGroqModel,
+      model: defaultGroqModel,
     }
   }
 
@@ -451,10 +451,6 @@ async function generateWithGroq({ apiKey, model, prompt }) {
     temperature: 0.35,
     max_completion_tokens: maxCompletionTokens,
     response_format: { type: 'json_object' },
-  }
-
-  if (model.startsWith('openai/gpt-oss')) {
-    requestBody.include_reasoning = false
   }
 
   console.info('Groq PBL generation compact request', {

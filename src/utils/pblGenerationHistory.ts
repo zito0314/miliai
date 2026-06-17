@@ -144,6 +144,7 @@ function normalizeHistoryRecord(value: unknown): PblGenerationHistoryRecord | nu
 }
 
 function normalizeGenerationModel(value: unknown): GenerationModelId {
+  if (value === 'groq-gpt-oss-120b') return 'groq-llama-3.3-70b-versatile'
   return GENERATION_MODEL_OPTIONS.some((option) => option.id === value)
     ? value as GenerationModelId
     : DEFAULT_GENERATION_MODEL_ID

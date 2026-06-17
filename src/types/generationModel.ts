@@ -1,4 +1,4 @@
-export type GenerationModelId = 'gemini-2.5-flash' | 'groq-gpt-oss-120b'
+export type GenerationModelId = 'gemini-2.5-flash' | 'groq-llama-3.3-70b-versatile'
 
 export type GenerationModelOption = {
   id: GenerationModelId
@@ -17,9 +17,9 @@ export const GENERATION_MODEL_OPTIONS: GenerationModelOption[] = [
     modelName: 'gemini-2.5-flash',
   },
   {
-    id: 'groq-gpt-oss-120b',
-    label: 'Groq GPT-OSS 120B',
+    id: 'groq-llama-3.3-70b-versatile',
+    label: 'Groq Llama 3.3 70B Versatile',
     provider: 'Groq',
-    modelName: 'openai/gpt-oss-120b',
+    modelName: 'llama-3.3-70b-versatile',
   },
 ]
