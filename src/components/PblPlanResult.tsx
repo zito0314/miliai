@@ -136,25 +136,6 @@ export function PblPlanResult({ plan, subjectName, techItems, historyCount, onPl
         }}
       />
 
-      <section className="answer-guide-actions" aria-label="예상 답안 생성">
-        <div>
-          <span>기획자용 예상 답안</span>
-          <h3>예상 답안 생성</h3>
-          <p>스텝의 기대 기준, 선택지 정답, 제출 PASS 기준을 바탕으로 기획자용 답안 가이드를 생성합니다.</p>
-        </div>
-        <Button
-          type="primary"
-          icon={<FileTextOutlined />}
-          loading={answerGuideGeneratingTarget === 'all'}
-          disabled={answerGuideGeneratingTarget !== null}
-          onClick={() => void handleGenerateAnswerGuide()}
-        >
-          {answerGuideGeneratingTarget === 'all' ? '예상 답안을 생성하는 중이에요.' : '예상 답안 생성'}
-        </Button>
-      </section>
-
-      {answerGuideError && <Alert className="refine-error-alert" type="error" showIcon message={answerGuideError} />}
-
       <RefineResultNotice message={lastChangeSummary} />
 
       <div className="pbl-summary workbook-summary">
@@ -204,8 +185,6 @@ export function PblPlanResult({ plan, subjectName, techItems, historyCount, onPl
         message="AI가 생성한 JSON-ready PBL 콘텐츠 초안입니다. 학생 노출 문구, 내부 메모, 모바일 수행성, 보안 제약을 검토해주세요."
       />
 
-      <AnswerGuidePanel answerGuides={plan.answerGuides} />
-
       <Tabs
         className="workbook-tabs"
         activeKey={activeTabKey}
@@ -225,6 +204,27 @@ export function PblPlanResult({ plan, subjectName, techItems, historyCount, onPl
           ),
         }))}
       />
+
+      <section className="answer-guide-actions" aria-label="예상 답안 생성">
+        <div>
+          <span>기획자용 예상 답안</span>
+          <h3>예상 답안 생성</h3>
+          <p>스텝의 기대 기준, 선택지 정답, 제출 PASS 기준을 바탕으로 기획자용 답안 가이드를 생성합니다.</p>
+        </div>
+        <Button
+          type="primary"
+          icon={<FileTextOutlined />}
+          loading={answerGuideGeneratingTarget === 'all'}
+          disabled={answerGuideGeneratingTarget !== null}
+          onClick={() => void handleGenerateAnswerGuide()}
+        >
+          {answerGuideGeneratingTarget === 'all' ? '예상 답안을 생성하는 중이에요.' : '예상 답안 생성'}
+        </Button>
+      </section>
+
+      {answerGuideError && <Alert className="refine-error-alert" type="error" showIcon message={answerGuideError} />}
+
+      <AnswerGuidePanel answerGuides={plan.answerGuides} />
     </section>
   )
 }
