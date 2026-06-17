@@ -233,6 +233,8 @@ export const pblPlanSchema = pblContentSchema.extend({
 
 const defaultGeminiModel = 'gemini-2.5-flash'
 const defaultGroqModel = 'openai/gpt-oss-120b'
+const defaultGroqMaxCompletionTokens = 4500
+const groqTechContextMaxChars = 3500
 const defaultGenerationModelId = 'gemini-2.5-flash'
 const generationModelSchema = z.enum(['gemini-2.5-flash', 'groq-gpt-oss-120b'])
 
@@ -241,9 +243,6 @@ delete responseJsonSchema.$schema
 
 const geminiResponseJsonSchema = cloneJsonSchema(responseJsonSchema)
 simplifyGeminiSchema(geminiResponseJsonSchema)
-
-const groqResponseJsonSchema = cloneJsonSchema(responseJsonSchema)
-simplifyGroqSchema(groqResponseJsonSchema)
 
 const jsonReadyWorkbookSheetNames = [
   '00_README',
@@ -361,9 +360,11 @@ export default async function handler(request, response) {
   }
 
   try {
-    const prompt = buildPrompt(subjectName.slice(0, 200), techContext, referenceUrls)
+    const prompt = generationModel.provider === 'groq'
+      ? buildGroqPrompt(subjectName.slice(0, 200), techContext)
+      : buildPrompt(subjectName.slice(0, 200), techContext, referenceUrls)
     const generationResult = generationModel.provider === 'groq'
-      ? await generateWithGroq({ apiKey, model: generationModel.model, prompt, referenceUrls })
+      ? await generateWithGroq({ apiKey, model: generationModel.model, prompt })
       : await generateWithGemini({ apiKey, model: generationModel.model, prompt, referenceUrls })
 
     const generatedPlan = parseGeminiJson(generationResult.text)
@@ -431,28 +432,33 @@ async function generateWithGemini({ apiKey, model, prompt, referenceUrls }) {
   }
 }
 
-async function generateWithGroq({ apiKey, model, prompt, referenceUrls }) {
-  const { prompt: groqPrompt, failedUrls } = await appendFetchedReferenceContent(prompt, referenceUrls)
+async function generateWithGroq({ apiKey, model, prompt }) {
+  const maxCompletionTokens = resolveGroqMaxCompletionTokens()
+  const requestBody = {
+    model,
+    messages: [{ role: 'user', content: prompt }],
+    temperature: 0.35,
+    max_completion_tokens: maxCompletionTokens,
+    response_format: { type: 'json_object' },
+  }
+
+  if (model.startsWith('openai/gpt-oss')) {
+    requestBody.include_reasoning = false
+  }
+
+  console.info('Groq PBL generation compact request', {
+    model,
+    promptChars: prompt.length,
+    maxCompletionTokens,
+  })
+
   const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      model,
-      messages: [{ role: 'user', content: groqPrompt }],
-      temperature: 0.35,
-      max_completion_tokens: 30000,
-      response_format: {
-        type: 'json_schema',
-        json_schema: {
-          name: 'pbl_content',
-          strict: true,
-          schema: groqResponseJsonSchema,
-        },
-      },
-    }),
+    body: JSON.stringify(requestBody),
   })
 
   const data = await groqResponse.json().catch(() => null)
@@ -468,10 +474,16 @@ async function generateWithGroq({ apiKey, model, prompt, referenceUrls }) {
 
   return {
     text: content,
-    warning: failedUrls.length
-      ? '기준 문서 URL을 일부 확인하지 못했지만, 기본 생성 규칙으로 PBL 초안을 생성했어요.'
-      : null,
+    warning: 'Groq는 계정 TPM 한도에 맞춰 압축 프롬프트로 생성했어요. 세부 기본 사전과 검토표는 서버가 보정합니다.',
   }
+}
+
+function resolveGroqMaxCompletionTokens() {
+  const configured = Number.parseInt(process.env.GROQ_MAX_COMPLETION_TOKENS || '', 10)
+  if (Number.isFinite(configured) && configured > 0) {
+    return Math.min(Math.max(configured, 1024), 30000)
+  }
+  return defaultGroqMaxCompletionTokens
 }
 
 async function appendFetchedReferenceContent(prompt, referenceUrls) {
@@ -1522,24 +1534,99 @@ export function simplifyGeminiSchema(value) {
   Object.values(value).forEach(simplifyGeminiSchema)
 }
 
-function simplifyGroqSchema(value) {
-  if (Array.isArray(value)) {
-    value.forEach(simplifyGroqSchema)
-    return
-  }
-  if (!value || typeof value !== 'object') return
-
-  delete value.minItems
-  delete value.maxItems
-  delete value.default
-  if (value.properties && typeof value.properties === 'object' && !Array.isArray(value.properties)) {
-    value.required = Object.keys(value.properties)
-  }
-  Object.values(value).forEach(simplifyGroqSchema)
-}
-
 function cloneJsonSchema(value) {
   return JSON.parse(JSON.stringify(value))
+}
+
+function compactText(value, maxChars) {
+  if (!value) return ''
+  const compacted = value
+    .replace(/\r\n/g, '\n')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+  return compacted.length > maxChars ? `${compacted.slice(0, maxChars)}\n...(이하 생략)` : compacted
+}
+
+function buildGroqPrompt(subjectName, techContext) {
+  const compactTechContext = compactText(techContext, groqTechContextMaxChars)
+
+  return `너는 Mili AI PBL 콘텐츠 기획자다.
+Groq on-demand TPM 한도 안에서 생성해야 하므로 간결한 JSON만 반환한다.
+마크다운, 설명 문장, 코드블록은 절대 반환하지 않는다.
+모든 문자열은 한국어로 작성한다.
+
+[과목명]
+${subjectName}
+
+[참고 기술 사전 - 압축]
+${compactTechContext || '별도 기술 컨텍스트 없음'}
+
+[반환 구조]
+반드시 최상위에 project와 missions를 포함한다.
+ui_blocks, environment_tags, validation_checklist, excelWorkbook은 생략해도 된다. 서버가 기본값으로 보정한다.
+
+project에는 title, short_description, project_goal, target_learner, tech_stack, final_outputs, constraints를 포함한다.
+missions는 정확히 2개만 만든다.
+각 mission에는 title, mission_overview, learning_goal, core_learning_action, student_outputs, steps, submission을 포함한다.
+각 mission의 steps는 3~4개만 만든다.
+
+[Step 규칙]
+block_type은 아래 중에서만 사용한다.
+situation_card, concept_card, vod_recommendation, single_choice, multiple_choice, sequence_order, code_fill_blank, code_error_finding, result_prediction, ai_tutor_question, self_checklist, peer_review_request, pc_verification, submission
+
+각 step에는 title, block_type, learner_text, learner_action, device_target, learning_role을 우선 포함한다.
+선택형/순서형/코드형 step에는 options를 2~4개 포함하고, 정답에는 is_correct: true와 is_expected: true를 표시한다.
+모바일에서는 긴 코드 작성을 요구하지 않는다. 긴 코드 실행과 최종 제출은 PC step으로 분리한다.
+실제 군 내부 데이터, 개인정보, 보안 민감 정보 사용을 요구하지 않는다.
+문자열은 짧고 구체적으로 작성한다.
+
+[권장 미션 흐름]
+1번째 mission: 군 실무 문제 상황 이해, 판단 기준 선택, 해결 절차 조립
+2번째 mission: 모바일 점검 활동, PC 검증 안내, 최종 제출 또는 피어리뷰
+
+[JSON 예시 형태]
+{
+  "project": {
+    "title": "과목명 기반 프로젝트명",
+    "short_description": "한 문장 설명",
+    "project_goal": "학습 목표",
+    "target_learner": "군 장병",
+    "tech_stack": "사용 기술",
+    "final_outputs": "최종 산출물",
+    "constraints": "비식별/가상 데이터 사용"
+  },
+  "missions": [
+    {
+      "title": "미션명",
+      "mission_overview": "미션 설명",
+      "learning_goal": "학습 목표",
+      "core_learning_action": "핵심 행동",
+      "student_outputs": "산출물",
+      "steps": [
+        {
+          "block_type": "single_choice",
+          "title": "활동명",
+          "learner_text": "학생 안내",
+          "learner_action": "하나 선택",
+          "device_target": "mobile",
+          "learning_role": "decide",
+          "question": "질문",
+          "options": [
+            { "label": "정답 선택지", "is_correct": true, "is_expected": true, "explanation": "해설" },
+            { "label": "오답 선택지", "is_correct": false, "is_expected": false, "explanation": "해설" }
+          ]
+        }
+      ],
+      "submission": {
+        "submission_title": "제출명",
+        "student_instruction": "제출 안내",
+        "evaluation_text": "평가 안내",
+        "pass_criteria": "PASS 기준"
+      }
+    }
+  ]
+}`
 }
 
 function buildPrompt(subjectName, techContext, referenceUrls) {

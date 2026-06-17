@@ -41,6 +41,7 @@ GEMINI_API_KEY=발급받은_API_키
 GEMINI_MODEL=gemini-2.5-flash
 GROQ_API_KEY=발급받은_GROQ_API_키
 GROQ_MODEL=openai/gpt-oss-120b
+GROQ_MAX_COMPLETION_TOKENS=4500
 PBL_HISTORY_SCRIPT_URL=발급받은_APPS_SCRIPT_웹앱_URL
 PBL_HISTORY_SCRIPT_SECRET=Apps_Script와_같은_시크릿
 ```
@@ -50,6 +51,7 @@ npx vercel dev
 ```
 
 API 키는 브라우저 코드나 Git 저장소에 넣지 않습니다. 과정설계 요청은 Vercel Function인 `/api/generate-pbl`을 통해 서버에서 선택한 모델로 전달됩니다. 기본 선택 모델은 기존 Gemini 2.5 Flash(`gemini-2.5-flash`)이며, 추가 선택지는 Groq GPT-OSS 120B(`openai/gpt-oss-120b`)입니다.
+Groq on-demand 계정은 TPM 한도가 낮을 수 있어 기본값으로 압축 프롬프트와 JSON Object Mode를 사용합니다. Groq 유료 티어에서 더 긴 결과가 필요하면 `GROQ_MAX_COMPLETION_TOKENS` 값을 늘릴 수 있습니다.
 
 ## PBL 생성 이력 저장소 설정
 
