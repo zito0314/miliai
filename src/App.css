@@ -322,6 +322,17 @@
   font-size: 14px;
 }
 
+.pbl-history-more {
+  display: flex;
+  justify-content: center;
+  margin-top: 12px;
+}
+
+.pbl-history-more .ant-btn {
+  min-width: 148px;
+  font-weight: 750;
+}
+
 .pbl-result {
   border-top: 1px solid #cfdad6;
   margin-top: 26px;
@@ -2467,7 +2478,8 @@ mark {
   }
 
   .pbl-history-heading .ant-btn,
-  .pbl-history-actions .ant-btn {
+  .pbl-history-actions .ant-btn,
+  .pbl-history-more .ant-btn {
     width: 100%;
   }
 

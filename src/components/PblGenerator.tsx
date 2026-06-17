@@ -27,6 +27,8 @@ import {
 } from '../utils/pblGenerationHistory'
 import { PblPlanResult } from './PblPlanResult'
 
+const HISTORY_PAGE_SIZE = 5
+
 type PblGeneratorProps = {
   techItems: TechItem[]
   isTechItemsLoading: boolean
@@ -224,6 +226,7 @@ export function PblGenerator({ techItems, isTechItemsLoading }: PblGeneratorProp
         {error && <Alert className="pbl-generator-error" type="error" showIcon title={error} />}
 
         <PblGenerationHistoryPanel
+          key={generationRecords[0]?.id ?? 'empty'}
           records={generationRecords}
           activeHistoryId={activeHistoryId}
           onOpen={handleOpenHistoryRecord}
@@ -259,6 +262,10 @@ function PblGenerationHistoryPanel({
   onDelete: (recordId: string) => void
   onClear: () => void
 }) {
+  const [visibleRecordCount, setVisibleRecordCount] = useState(HISTORY_PAGE_SIZE)
+  const visibleRecords = records.slice(0, visibleRecordCount)
+  const hiddenRecordCount = Math.max(records.length - visibleRecords.length, 0)
+
   return (
     <section className="pbl-history-panel" aria-label="PBL 생성 이력">
       <div className="pbl-history-heading">
@@ -280,33 +287,46 @@ function PblGenerationHistoryPanel({
       {records.length === 0 ? (
         <p className="pbl-history-empty">저장된 생성 이력이 없습니다.</p>
       ) : (
-        <div className="pbl-history-list">
-          {records.map((record) => (
-            <article
-              className={`pbl-history-item${record.id === activeHistoryId ? ' is-active' : ''}`}
-              key={record.id}
-              aria-current={record.id === activeHistoryId ? 'true' : undefined}
-            >
-              <div className="pbl-history-main">
-                <strong>{record.title}</strong>
-                <div className="pbl-history-meta">
-                  <span>{formatHistoryDate(record.updatedAt)}</span>
-                  <Tag>{record.generationModelName}</Tag>
-                  <Tag>{record.plan.missions.length}개 미션</Tag>
-                  {record.id === activeHistoryId && <Tag color="green">열림</Tag>}
+        <>
+          <div className="pbl-history-list">
+            {visibleRecords.map((record) => (
+              <article
+                className={`pbl-history-item${record.id === activeHistoryId ? ' is-active' : ''}`}
+                key={record.id}
+                aria-current={record.id === activeHistoryId ? 'true' : undefined}
+              >
+                <div className="pbl-history-main">
+                  <strong>{record.title}</strong>
+                  <div className="pbl-history-meta">
+                    <span>{formatHistoryDate(record.updatedAt)}</span>
+                    <Tag>{record.generationModelName}</Tag>
+                    <Tag>{record.plan.missions.length}개 미션</Tag>
+                    {record.id === activeHistoryId && <Tag color="green">열림</Tag>}
+                  </div>
                 </div>
-              </div>
-              <div className="pbl-history-actions">
-                <Button size="small" icon={<FolderOpenOutlined />} onClick={() => onOpen(record)}>
-                  불러오기
-                </Button>
-                <Button size="small" danger icon={<DeleteOutlined />} onClick={() => onDelete(record.id)}>
-                  삭제
-                </Button>
-              </div>
-            </article>
-          ))}
-        </div>
+                <div className="pbl-history-actions">
+                  <Button size="small" icon={<FolderOpenOutlined />} onClick={() => onOpen(record)}>
+                    불러오기
+                  </Button>
+                  <Button size="small" danger icon={<DeleteOutlined />} onClick={() => onDelete(record.id)}>
+                    삭제
+                  </Button>
+                </div>
+              </article>
+            ))}
+          </div>
+          {hiddenRecordCount > 0 && (
+            <div className="pbl-history-more">
+              <Button
+                onClick={() => {
+                  setVisibleRecordCount((currentCount) => currentCount + HISTORY_PAGE_SIZE)
+                }}
+              >
+                더보기
+              </Button>
+            </div>
+          )}
+        </>
       )}
     </section>
   )
