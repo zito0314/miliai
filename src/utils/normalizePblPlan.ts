@@ -153,6 +153,7 @@ function normalizeProject(project: Project): Project {
     environment_type: asString(project?.environment_type, '모바일 중심 + PC 검증형'),
     duration_label: asString(project?.duration_label, '4주 / 모바일 세션 8회(회당 15~25분) + PC 검증 세션 2회(회당 60분)'),
     target_learner: asString(project?.target_learner, 'AI 활용 경험이 많지 않은 군 장병'),
+    team_structure: asString(project?.team_structure, '2~3인 팀 권장, 개인 수행 가능'),
     difficulty_label: asString(project?.difficulty_label, '3~4레벨'),
     project_goal: asString(project?.project_goal, '비식별 또는 가상 데이터를 바탕으로 실무 문제를 정의하고 개선안을 제안합니다.'),
     learning_mode: asString(project?.learning_mode, '모바일 카드 활동, AI 교관 질문, 동료 피드백, PC 검증 실습을 병행합니다.'),

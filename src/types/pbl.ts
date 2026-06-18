@@ -37,6 +37,7 @@ export type Project = {
   environment_type: string
   duration_label: string
   target_learner: string
+  team_structure?: string
   difficulty_label: string
   project_goal: string
   learning_mode: string

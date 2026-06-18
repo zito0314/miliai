@@ -25,6 +25,12 @@ import {
   updatePblGenerationHistoryRecord,
   upsertPblGenerationHistoryRecord,
 } from '../utils/pblGenerationHistory'
+import {
+  createEquipmentMaintenanceExamplePblPlan,
+  createLogisticsExamplePblPlan,
+  createPxSalesBeginnerExamplePblPlan,
+} from '../utils/createLogisticsExamplePblPlan'
+import { downloadJson } from '../utils/downloadJson'
 import { PblPlanResult } from './PblPlanResult'
 
 const HISTORY_PAGE_SIZE = 5
@@ -117,7 +123,93 @@ export function PblGenerator({ techItems, isTechItemsLoading, onLoadTechItems }:
     }
   }
 
+<<<<<<< Updated upstream
   const waitingForInitialTechItems = isTechItemsLoading && techItems.length === 0
+=======
+  const handleOpenExampleContent = async () => {
+    setGenerating(true)
+    setError(null)
+    try {
+      const examplePlan = await createLogisticsExamplePblPlan()
+      const historyRecord = createPblGenerationHistoryRecord(examplePlan, generationModel)
+      setPlan(examplePlan)
+      setSubjectName(examplePlan.project.title)
+      setPlanHistory([])
+      setActiveHistoryId(historyRecord.id)
+      setGenerationRecords((currentRecords) => upsertPblGenerationHistoryRecord(currentRecords, historyRecord))
+      void upsertRemotePblGenerationHistoryRecord(historyRecord)
+        .then(syncRemoteHistoryRecords)
+        .catch((historyError) => {
+          console.warn('Remote PBL history save failed', historyError)
+        })
+    } catch (exampleError) {
+      setError(exampleError instanceof Error ? exampleError.message : '예시 콘텐츠를 불러오지 못했어요.')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  const handleOpenEquipmentMaintenanceExampleContent = async () => {
+    setGenerating(true)
+    setError(null)
+    try {
+      const examplePlan = await createEquipmentMaintenanceExamplePblPlan()
+      const historyRecord = createPblGenerationHistoryRecord(examplePlan, generationModel)
+      setPlan(examplePlan)
+      setSubjectName(examplePlan.project.title)
+      setPlanHistory([])
+      setActiveHistoryId(historyRecord.id)
+      setGenerationRecords((currentRecords) => upsertPblGenerationHistoryRecord(currentRecords, historyRecord))
+      void upsertRemotePblGenerationHistoryRecord(historyRecord)
+        .then(syncRemoteHistoryRecords)
+        .catch((historyError) => {
+          console.warn('Remote PBL history save failed', historyError)
+        })
+    } catch (exampleError) {
+      setError(exampleError instanceof Error ? exampleError.message : '장비 정비 이력 예시 콘텐츠를 불러오지 못했어요.')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  const handleOpenPxSalesBeginnerExampleContent = async () => {
+    setGenerating(true)
+    setError(null)
+    try {
+      const examplePlan = await createPxSalesBeginnerExamplePblPlan()
+      const historyRecord = createPblGenerationHistoryRecord(examplePlan, generationModel)
+      setPlan(examplePlan)
+      setSubjectName(examplePlan.project.title)
+      setPlanHistory([])
+      setActiveHistoryId(historyRecord.id)
+      setGenerationRecords((currentRecords) => upsertPblGenerationHistoryRecord(currentRecords, historyRecord))
+      void upsertRemotePblGenerationHistoryRecord(historyRecord)
+        .then(syncRemoteHistoryRecords)
+        .catch((historyError) => {
+          console.warn('Remote PBL history save failed', historyError)
+        })
+    } catch (exampleError) {
+      setError(exampleError instanceof Error ? exampleError.message : 'PX 인기 품목 분석 예시 콘텐츠를 불러오지 못했어요.')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  const handleDownloadExampleJson = async () => {
+    setGenerating(true)
+    setError(null)
+    try {
+      const examplePlan = await createLogisticsExamplePblPlan()
+      downloadJson(examplePlan)
+    } catch (exampleError) {
+      setError(exampleError instanceof Error ? exampleError.message : '예시 JSON을 다운로드하지 못했어요.')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  const unavailable = isTechItemsLoading || techItems.length === 0
+>>>>>>> Stashed changes
 
   const handlePlanUpdated = (updatedPlan: PblPlan) => {
     setPlan((currentPlan) => {
@@ -231,6 +323,26 @@ export function PblGenerator({ techItems, isTechItemsLoading, onLoadTechItems }:
           </Button>
         </div>
 
+<<<<<<< Updated upstream
+=======
+        <div className="pbl-generator-example-actions">
+          <Button size="large" onClick={() => void handleOpenExampleContent()} disabled={generating}>
+            AI 기반 군수 운영 최적화 과정 예시 보기
+          </Button>
+          <Button size="large" onClick={() => void handleOpenEquipmentMaintenanceExampleContent()} disabled={generating}>
+            장비 정비 이력 예시 보기
+          </Button>
+          <Button size="large" onClick={() => void handleOpenPxSalesBeginnerExampleContent()} disabled={generating}>
+            PX 인기 품목 분석 예시 보기
+          </Button>
+          <Button size="large" onClick={() => void handleDownloadExampleJson()} disabled={generating}>
+            예시 JSON 다운로드
+          </Button>
+          <p>AI 연결 없이 미션 브리핑과 Step 화면을 바로 확인합니다.</p>
+        </div>
+
+        {unavailable && <p className="pbl-generator-help">기술 데이터를 불러온 뒤 생성할 수 있어요.</p>}
+>>>>>>> Stashed changes
         {error && <Alert className="pbl-generator-error" type="error" showIcon title={error} />}
 
         <PblGenerationHistoryPanel

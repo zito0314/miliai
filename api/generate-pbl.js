@@ -18,6 +18,7 @@ export const projectSchema = z.object({
   environment_type: z.string(),
   duration_label: z.string(),
   target_learner: z.string(),
+  team_structure: z.string().optional(),
   difficulty_label: z.string(),
   project_goal: z.string(),
   learning_mode: z.string(),
@@ -621,6 +622,9 @@ ${referenceBrief}
 - PBL-first, Mission-Based Learning 방식으로 작성한다.
 - 군 장병이 실제로 접할 수 있는 업무/훈련/군수/행정/안전/교육 문제에서 출발한다.
 - 실제 군 내부 데이터, 개인정보, 보안 민감 정보 사용을 요구하지 않는다.
+- project.team_structure를 작성한다. 특별한 이유가 없으면 2~3인 팀 또는 3인 팀 기반으로 설계하고, 개인 수행 가능 여부도 함께 표시한다.
+- 동료 평가가 가능하도록 후반 미션 산출물과 submission에는 피어리뷰 흐름을 고려한다.
+- 각 mission.estimated_time에는 "1~2주차 / 모바일 4회"처럼 주차 또는 회차 범위를 포함한다.
 - 모바일 활동과 PC 검증을 분리한다.
 - 모바일은 상황 이해, 선택, 순서 배열, 코드 읽기, 오류 찾기, 결과 예측 중심이다.
 - PC는 긴 코드 실행, 검증, 파일/URL 제출 중심이다.
@@ -634,6 +638,7 @@ ${referenceBrief}
     "environment_type": "모바일 중심 + PC 검증형",
     "duration_label": "예: 3주 / 모바일 세션 + PC 검증",
     "target_learner": "AI 활용 경험이 많지 않은 군 장병",
+    "team_structure": "예: 2~3인 팀 권장, 개인 수행 가능",
     "difficulty_label": "3~4레벨",
     "project_goal": "최종 학습 목표",
     "learning_mode": "모바일 카드 활동, AI 교관 질문, PC 검증",
@@ -652,7 +657,7 @@ ${referenceBrief}
       "learning_goal": "학습 목표",
       "core_learning_action": "핵심 행동",
       "student_outputs": "학생 산출물",
-      "estimated_time": "예: 20~30분",
+      "estimated_time": "예: 1주차 / 모바일 2회",
       "scenario_focus": "군 실무 문제 상황",
       "step_focus": ["상황 이해", "판단 기준 선택", "해결 순서 조립", "모바일 검토", "간단 제출"]
     },
@@ -662,7 +667,7 @@ ${referenceBrief}
       "learning_goal": "학습 목표",
       "core_learning_action": "핵심 행동",
       "student_outputs": "학생 산출물",
-      "estimated_time": "예: 30~40분",
+      "estimated_time": "예: 2~3주차 / 모바일 4회 + PC 검증 1회",
       "scenario_focus": "검증과 제출 상황",
       "step_focus": ["개념 확인", "오류 원인 찾기", "결과 예측", "PC 검증", "최종 제출"]
     }
@@ -699,6 +704,9 @@ ${stepPattern}
 
 [필수 작성 원칙]
 - mission은 군 실무 문제에서 출발해야 한다.
+- mission_overview는 학생에게 Step 전에 노출되는 "미션 단위 문제 상황"이다. 단순 소개가 아니라 어떤 군 실무 문제가 발생했고 왜 해결해야 하는지 2~3문장으로 쓴다.
+- core_learning_action은 학생이 이번 미션에서 실제로 수행할 "미션"이다. 분석/선택/코딩/검증/제출 행동이 분명하게 보이게 쓴다.
+- student_outputs는 미션을 끝냈을 때 남겨야 할 산출물이다. 보고서만이 아니라 코드, 표, 체크리스트, 실행 결과, 제출 파일/URL 등 구체 형식을 포함한다.
 - steps는 정확히 5개 작성한다.
 - 각 step은 하나의 작은 학습 행동만 담는다.
 - 학생 노출 문구와 내부 검토 메모를 분리한다.
@@ -720,7 +728,7 @@ ${stepPattern}
   "student_outputs": "학생 산출물",
   "planner_review_points": "기획자 검토 포인트",
   "developer_note": "개발 구현 메모",
-  "mission_overview": "미션 설명",
+  "mission_overview": "학생에게 Step 전에 보여줄 미션 단위 문제 상황과 해결 필요성",
   "learning_goal": "학습 목표",
   "prerequisites": "선수 지식",
   "tech_stack": "사용 기술",
@@ -985,6 +993,7 @@ function normalizeProject(value, fallbackSubjectName) {
     environment_type: asString(rawProject.environment_type, '모바일 중심 + PC 검증형'),
     duration_label: asString(rawProject.duration_label, '4주 / 모바일 세션 8회(회당 15~25분) + PC 검증 세션 2회(회당 60분)'),
     target_learner: asString(rawProject.target_learner, 'AI 활용 경험이 많지 않은 군 장병'),
+    team_structure: asString(rawProject.team_structure, '2~3인 팀 권장, 개인 수행 가능'),
     difficulty_label: asString(rawProject.difficulty_label, '3~4레벨'),
     project_goal: asString(rawProject.project_goal, '비식별 또는 가상 데이터를 바탕으로 실무 문제를 정의하고 개선안을 제안합니다.'),
     learning_mode: asString(rawProject.learning_mode, '모바일 카드 활동, AI 교관 질문, 동료 피드백, PC 검증 실습을 병행합니다.'),
@@ -1425,6 +1434,7 @@ function buildProjectRows(plan) {
     'environment_type',
     'duration_label',
     'target_learner',
+    'team_structure',
     'difficulty_label',
     'project_goal',
     'learning_mode',
@@ -2080,8 +2090,15 @@ developer_note에는 다음 내용을 포함한다.
 * project, missions, steps, options, submission, ui_blocks, environment_tags, validation_checklist 구조로 생성한다.
 * 과목명만 보고 기술 목차를 만들지 말고, 군 실무 문제 상황을 먼저 정의한다.
 * 프로젝트는 군 장병이 실제로 접할 수 있는 업무, 훈련, 행정, 장비, 군수, 정보, 안전, 교육 상황과 연결한다.
+* project.team_structure에는 팀 구성 정보를 작성한다. 특별한 이유가 없으면 2~3인 팀 또는 3인 팀을 권장하고, 필요 시 개인 수행 가능 여부를 함께 쓴다.
+* 동료 평가를 위해 최소 1개 이상의 미션은 peer_review_required를 true로 설정한다. 팀 기반 프로젝트에서는 후반 미션의 peer_review_required를 true로 두는 것을 기본으로 한다.
+* 각 mission.estimated_time에는 미션별 수행 주차 또는 회차를 작성한다. 예: "1~2주차 / 모바일 4회", "5~6주차 / PC 검증 2회". 분 단위만 단독으로 쓰지 않는다.
 * 미션은 2~4개로 구성한다.
 * 미션 개수는 난이도, 총 수행 시간, 최종 산출물 범위에 따라 결정한다.
+* 각 미션은 Step 목록 전에 학생에게 보여줄 수 있는 mission_overview, core_learning_action, student_outputs를 반드시 구체적으로 작성한다.
+* mission_overview에는 해당 미션의 문제 상황과 해결 필요성을 작성한다. "미션 설명"처럼 추상적으로 쓰지 않는다.
+* core_learning_action에는 학생이 이번 미션에서 해야 할 실제 수행 미션을 작성한다.
+* student_outputs에는 미션 완료 후 제출하거나 남겨야 할 구체 산출물을 작성한다.
 * 각 미션은 실제 화면에 들어갈 수 있는 학습활동 step 단위로 구성한다.
 * 학생에게 보이는 문구와 내부 검토 메모를 분리한다.
 * 학생 노출 문구는 learner_text, student_instruction, evaluation_text에 작성한다.

@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
-import { CopyOutlined, DownloadOutlined, FileTextOutlined } from '@ant-design/icons'
+import { CopyOutlined, DownloadOutlined, FileTextOutlined, SaveOutlined } from '@ant-design/icons'
 import { Alert, Button, Tabs, Tag, message } from 'antd'
 import type { ExcelWorkbookSheet, Mission, PblPlan, Step } from '../types/pbl'
 import type { RefineTargetType } from '../types/refine'
 import type { TechItem } from '../types/tech'
 import { generateAnswerGuide } from '../services/generateAnswerGuide'
+import { savePblProject } from '../services/savePblProject'
 import { copyWorkbookAsTsv, copyWorkbookSheetAsTsv } from '../utils/copyPblPlanAsTsv'
 import { downloadJson } from '../utils/downloadJson'
 import { getByPath } from '../utils/getByPath'
@@ -43,6 +44,7 @@ export function PblPlanResult({ plan, subjectName, techItems, historyCount, onPl
   const [lastChangeSummary, setLastChangeSummary] = useState<string | null>(null)
   const [answerGuideError, setAnswerGuideError] = useState<string | null>(null)
   const [answerGuideGeneratingTarget, setAnswerGuideGeneratingTarget] = useState<'all' | number | null>(null)
+  const [savingProjectList, setSavingProjectList] = useState(false)
   const [messageApi, contextHolder] = message.useMessage()
   const activeSheet = useMemo(
     () => plan.excelWorkbook.sheets.find((sheet) => sheet.sheetName === activeSheetName) || plan.excelWorkbook.sheets[0],
@@ -104,6 +106,18 @@ export function PblPlanResult({ plan, subjectName, techItems, historyCount, onPl
     }
   }
 
+  const handleSaveProjectList = async () => {
+    setSavingProjectList(true)
+    try {
+      const result = await savePblProject(plan)
+      messageApi.success(`${result.relativePath}에 저장했어요.`)
+    } catch (error) {
+      messageApi.error(error instanceof Error ? error.message : 'project-list 폴더에 저장하지 못했어요.')
+    } finally {
+      setSavingProjectList(false)
+    }
+  }
+
   return (
     <section className="pbl-result" aria-label="생성된 PBL 콘텐츠">
       {contextHolder}
@@ -135,6 +149,9 @@ export function PblPlanResult({ plan, subjectName, techItems, historyCount, onPl
           </Button>
           <Button icon={<DownloadOutlined />} onClick={() => downloadJson(plan)}>
             JSON 다운로드
+          </Button>
+          <Button icon={<SaveOutlined />} loading={savingProjectList} onClick={() => void handleSaveProjectList()}>
+            project-list에 저장
           </Button>
         </div>
       </div>
@@ -169,6 +186,7 @@ export function PblPlanResult({ plan, subjectName, techItems, historyCount, onPl
           <div className="pbl-project-facts">
             <span>환경 <strong>{plan.project.environment_type}</strong></span>
             <span>기간 <strong>{plan.project.duration_label}</strong></span>
+            <span>팀 구성 <strong>{plan.project.team_structure || '2~3인 팀 권장, 개인 수행 가능'}</strong></span>
             <span>난이도 <strong>{plan.project.difficulty_label}</strong></span>
             <span>미션 <strong>{plan.missions.length}개</strong></span>
           </div>
@@ -377,6 +395,10 @@ function MissionDetailList({
           </div>
 
           <dl className="json-detail-grid">
+            <div>
+              <dt>미션 기간</dt>
+              <dd>{mission.estimated_time}</dd>
+            </div>
             <div>
               <dt>핵심 학습 행동</dt>
               <dd>{mission.core_learning_action}</dd>

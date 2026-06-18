@@ -60,6 +60,7 @@ function buildProjectRows(plan: PblPlan) {
     'environment_type',
     'duration_label',
     'target_learner',
+    'team_structure',
     'difficulty_label',
     'project_goal',
     'learning_mode',

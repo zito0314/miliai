@@ -221,6 +221,7 @@ function MobilePreviewLayout({
     <div className="pbl-preview-mobile-shell">
       <MissionPreviewHeader mission={mission} />
       <div className="pbl-preview-step-stack">
+        <MissionBriefingCard mission={mission} mode="mobile" />
         {previewSteps.map(({ step, variant }) => (
           <StepPreviewCard
             key={step.step_id}
@@ -275,6 +276,7 @@ function PcPreviewLayout({
         </div>
       </aside>
       <main className="pbl-preview-pc-main">
+        <MissionBriefingCard mission={mission} mode="pc" />
         {selectedStep ? (
           <StepPreviewCard
             mission={mission}
@@ -290,6 +292,36 @@ function PcPreviewLayout({
         <SubmissionPreviewCard mission={mission} mode="pc" />
       </main>
     </div>
+  )
+}
+
+function MissionBriefingCard({ mission, mode }: { mission: PreviewMission; mode: PreviewDeviceMode }) {
+  const problemSituation = mission.mission_overview || mission.learning_goal || '이 미션에서 해결할 문제 상황을 확인합니다.'
+  const missionTask = mission.core_learning_action || mission.student_outputs || '문제 해결을 위한 핵심 활동을 수행합니다.'
+
+  return (
+    <article className={`pbl-preview-mission-briefing is-${mode}`}>
+      <div className="pbl-preview-briefing-eyebrow">
+        <QuestionCircleOutlined />
+        <span>미션 브리핑</span>
+      </div>
+      <section>
+        <strong>문제 상황</strong>
+        <p>{problemSituation}</p>
+      </section>
+      <section>
+        <strong>이번 미션</strong>
+        <p>{missionTask}</p>
+      </section>
+      <InfoGrid
+        items={[
+          ['미션 기간', mission.estimated_time],
+          ['학습 목표', mission.learning_goal],
+          ['제출 산출물', mission.student_outputs],
+          ['제약 조건', mission.constraints],
+        ]}
+      />
+    </article>
   )
 }
 

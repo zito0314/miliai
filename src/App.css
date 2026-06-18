@@ -206,6 +206,28 @@
   min-width: 142px;
 }
 
+<<<<<<< Updated upstream
+=======
+.pbl-generator-example-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.pbl-generator-example-actions p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.pbl-generator-help {
+  margin: 8px 0 0;
+  color: #8b6e22;
+  font-size: 12px;
+}
+
+>>>>>>> Stashed changes
 .pbl-generator-error {
   margin-top: 12px;
 }
@@ -938,6 +960,53 @@
   line-height: 1.55;
 }
 
+.pbl-preview-mission-briefing {
+  min-width: 0;
+  border: 1px solid #cbdcd6;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #f4faf7 0%, #ffffff 62%, #eef6f3 100%);
+  padding: 14px;
+  box-shadow: 0 10px 24px rgba(39, 67, 58, 0.08);
+}
+
+.pbl-preview-mission-briefing.is-pc {
+  padding: 16px;
+}
+
+.pbl-preview-briefing-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 12px;
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.pbl-preview-mission-briefing section + section {
+  margin-top: 12px;
+}
+
+.pbl-preview-mission-briefing strong {
+  display: block;
+  margin-bottom: 4px;
+  color: #17211f;
+  font-size: 13px;
+}
+
+.pbl-preview-mission-briefing p {
+  margin: 0;
+  color: #42524d;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.pbl-preview-mission-briefing .pbl-preview-info-grid {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #dce7e3;
+}
+
 .pbl-preview-step-stack {
   display: grid;
   gap: 12px;
@@ -1417,6 +1486,10 @@
   gap: 14px;
 }
 
+.json-mission-list {
+  gap: 0;
+}
+
 .json-mission-card,
 .json-step-card,
 .json-submission-card,
@@ -1428,7 +1501,22 @@
 }
 
 .json-mission-card {
+  position: relative;
   padding: 18px;
+}
+
+.json-mission-card + .json-mission-card {
+  margin-top: 28px;
+}
+
+.json-mission-card + .json-mission-card::before {
+  content: "";
+  position: absolute;
+  top: -15px;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: #9fb7af;
 }
 
 .json-step-card,
@@ -2458,6 +2546,15 @@ mark {
   }
 
   .pbl-generator-form .ant-btn {
+    width: 100%;
+  }
+
+  .pbl-generator-example-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .pbl-generator-example-actions .ant-btn {
     width: 100%;
   }
 
