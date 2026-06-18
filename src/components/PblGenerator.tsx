@@ -123,9 +123,8 @@ export function PblGenerator({ techItems, isTechItemsLoading, onLoadTechItems }:
     }
   }
 
-<<<<<<< Updated upstream
   const waitingForInitialTechItems = isTechItemsLoading && techItems.length === 0
-=======
+
   const handleOpenExampleContent = async () => {
     setGenerating(true)
     setError(null)
@@ -209,7 +208,6 @@ export function PblGenerator({ techItems, isTechItemsLoading, onLoadTechItems }:
   }
 
   const unavailable = isTechItemsLoading || techItems.length === 0
->>>>>>> Stashed changes
 
   const handlePlanUpdated = (updatedPlan: PblPlan) => {
     setPlan((currentPlan) => {
@@ -323,8 +321,6 @@ export function PblGenerator({ techItems, isTechItemsLoading, onLoadTechItems }:
           </Button>
         </div>
 
-<<<<<<< Updated upstream
-=======
         <div className="pbl-generator-example-actions">
           <Button size="large" onClick={() => void handleOpenExampleContent()} disabled={generating}>
             AI 기반 군수 운영 최적화 과정 예시 보기
@@ -342,7 +338,6 @@ export function PblGenerator({ techItems, isTechItemsLoading, onLoadTechItems }:
         </div>
 
         {unavailable && <p className="pbl-generator-help">기술 데이터를 불러온 뒤 생성할 수 있어요.</p>}
->>>>>>> Stashed changes
         {error && <Alert className="pbl-generator-error" type="error" showIcon title={error} />}
 
         <PblGenerationHistoryPanel
