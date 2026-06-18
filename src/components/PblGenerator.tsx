@@ -32,9 +32,10 @@ const HISTORY_PAGE_SIZE = 5
 type PblGeneratorProps = {
   techItems: TechItem[]
   isTechItemsLoading: boolean
+  onLoadTechItems: () => Promise<TechItem[] | null>
 }
 
-export function PblGenerator({ techItems, isTechItemsLoading }: PblGeneratorProps) {
+export function PblGenerator({ techItems, isTechItemsLoading, onLoadTechItems }: PblGeneratorProps) {
   const [subjectName, setSubjectName] = useState('')
   const [plan, setPlan] = useState<PblPlan | null>(null)
   const [planHistory, setPlanHistory] = useState<PblPlan[]>([])
@@ -86,7 +87,15 @@ export function PblGenerator({ techItems, isTechItemsLoading }: PblGeneratorProp
     setGenerating(true)
     setError(null)
     try {
-      const generatedPlan = await generatePblPlan(trimmedSubject, techItems, generationModel)
+      const refreshedTechItems = await onLoadTechItems()
+      const techItemsForGeneration = refreshedTechItems ?? techItems
+
+      if (techItemsForGeneration.length === 0) {
+        setError('기술 데이터를 불러오지 못했어요. 데이터를 확인한 뒤 다시 시도해주세요.')
+        return
+      }
+
+      const generatedPlan = await generatePblPlan(trimmedSubject, techItemsForGeneration, generationModel)
       const historyRecord = createPblGenerationHistoryRecord(generatedPlan, generationModel)
       setPlan(generatedPlan)
       setPlanHistory([])
@@ -108,7 +117,7 @@ export function PblGenerator({ techItems, isTechItemsLoading }: PblGeneratorProp
     }
   }
 
-  const unavailable = isTechItemsLoading || techItems.length === 0
+  const waitingForInitialTechItems = isTechItemsLoading && techItems.length === 0
 
   const handlePlanUpdated = (updatedPlan: PblPlan) => {
     setPlan((currentPlan) => {
@@ -195,7 +204,7 @@ export function PblGenerator({ techItems, isTechItemsLoading }: PblGeneratorProp
               if (error === '과목명을 입력해주세요.') setError(null)
             }}
             onPressEnter={() => {
-              if (!generating && !unavailable) void handleGenerate()
+              if (!generating && !waitingForInitialTechItems) void handleGenerate()
             }}
           />
           <Select<GenerationModelId>
@@ -215,14 +224,13 @@ export function PblGenerator({ techItems, isTechItemsLoading }: PblGeneratorProp
             size="large"
             icon={<ThunderboltOutlined />}
             loading={generating}
-            disabled={unavailable}
+            disabled={waitingForInitialTechItems}
             onClick={() => void handleGenerate()}
           >
             {generating ? '생성 중...' : '콘텐츠 생성'}
           </Button>
         </div>
 
-        {unavailable && <p className="pbl-generator-help">기술 데이터를 불러온 뒤 생성할 수 있어요.</p>}
         {error && <Alert className="pbl-generator-error" type="error" showIcon title={error} />}
 
         <PblGenerationHistoryPanel

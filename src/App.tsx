@@ -12,7 +12,6 @@ import { TagFilter } from './components/TagFilter'
 import { TechCard } from './components/TechCard'
 import { TechDetailPanel } from './components/TechDetailPanel'
 import { UnitBundles } from './components/UnitBundles'
-import { REFRESH_INTERVAL_MS } from './config/dataSource.js'
 import { fetchTechItems } from './services/fetchTechItems'
 import type { TechItem } from './types/tech'
 import { buildUnitBundles, matchesQuery } from './utils/search'
@@ -42,20 +41,22 @@ function App() {
     localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites))
   }, [favorites])
 
-  const loadTechItems = useCallback(async () => {
+  const loadTechItems = useCallback(async (): Promise<TechItem[] | null> => {
     const requestId = ++requestIdRef.current
     setLoading(true)
     setError(null)
 
     try {
       const items = await fetchTechItems()
-      if (requestId !== requestIdRef.current) return
+      if (requestId !== requestIdRef.current) return null
       setTechItems(items)
       setLastUpdated(new Date())
       setSelectedItem((current) => (current ? (items.find((item) => item.id === current.id) ?? null) : null))
+      return items
     } catch (loadError) {
-      if (requestId !== requestIdRef.current) return
+      if (requestId !== requestIdRef.current) return null
       setError(loadError instanceof Error ? loadError.message : '알 수 없는 오류가 발생했습니다.')
+      return null
     } finally {
       if (requestId === requestIdRef.current) setLoading(false)
     }
@@ -63,10 +64,8 @@ function App() {
 
   useEffect(() => {
     const initialLoadId = window.setTimeout(() => void loadTechItems(), 0)
-    const intervalId = window.setInterval(() => void loadTechItems(), REFRESH_INTERVAL_MS)
     return () => {
       window.clearTimeout(initialLoadId)
-      window.clearInterval(intervalId)
     }
   }, [loadTechItems])
 
@@ -128,7 +127,7 @@ function App() {
   return (
     <div className="app-shell">
       <Header />
-      <PblGenerator techItems={techItems} isTechItemsLoading={loading} />
+      <PblGenerator techItems={techItems} isTechItemsLoading={loading} onLoadTechItems={loadTechItems} />
       <SearchBar value={query} resultCount={filteredItems.length} onChange={setQuery} />
       <DataStatusBar
         loading={loading}
