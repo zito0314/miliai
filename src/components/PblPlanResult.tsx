@@ -139,42 +139,110 @@ export function PblPlanResult({ plan, subjectName, techItems, historyCount, onPl
         </div>
       </div>
 
+      <Tabs
+        className="result-view-tabs"
+        defaultActiveKey="user-summary"
+        items={[
+          {
+            key: 'user-summary',
+            label: '사용자용 요약',
+            children: <UserSummaryTab plan={plan} subjectName={subjectName} />,
+          },
+          {
+            key: 'mission-detail',
+            label: '미션 상세',
+            children: <MissionDetailTab plan={plan} />,
+          },
+          {
+            key: 'planner-review',
+            label: '기획자 검토',
+            children: (
+              <PlannerReviewTab
+                plan={plan}
+                techItems={techItems}
+                answerGuideGeneratingTarget={answerGuideGeneratingTarget}
+                onPlanUpdated={handlePlanUpdated}
+                onGenerateAnswerGuide={handleGenerateAnswerGuide}
+              />
+            ),
+          },
+          {
+            key: 'excel-json-data',
+            label: 'Excel/JSON 데이터',
+            children: (
+              <ExcelJsonDataTab
+                plan={plan}
+                techItems={techItems}
+                activeSheetName={activeTabKey}
+                onSheetChange={setActiveSheetName}
+                answerGuideGeneratingTarget={answerGuideGeneratingTarget}
+                onPlanUpdated={handlePlanUpdated}
+                onGenerateAnswerGuide={handleGenerateAnswerGuide}
+              />
+            ),
+          },
+          {
+            key: 'answer-guide',
+            label: '예상 답안',
+            children: (
+              <AnswerGuideTab
+                plan={plan}
+                answerGuideError={answerGuideError}
+                answerGuideGeneratingTarget={answerGuideGeneratingTarget}
+                onGenerateAnswerGuide={handleGenerateAnswerGuide}
+              />
+            ),
+          },
+        ]}
+      />
+    </section>
+  )
+}
+
+function UserSummaryTab({ plan, subjectName }: { plan: PblPlan; subjectName: string }) {
+  const deviceCounts = getMissionDeviceCounts(plan)
+
+  return (
+    <div className="user-summary-pane">
       <div className="pbl-summary workbook-summary">
         <div className="pbl-summary-main">
-          <span>프로젝트</span>
+          <span>프로젝트 개요</span>
           <dl>
             <div>
-              <dt>프로젝트 ID</dt>
-              <dd>{plan.project.project_id}</dd>
+              <dt>PBL 제목</dt>
+              <dd>{plan.project.title}</dd>
+            </div>
+            <div>
+              <dt>PBL 설명</dt>
+              <dd>{plan.project.short_description}</dd>
             </div>
             <div>
               <dt>과목명</dt>
               <dd>{subjectName}</dd>
             </div>
             <div>
-              <dt>목표</dt>
+              <dt>PBL 목표</dt>
               <dd>{plan.project.project_goal}</dd>
             </div>
             <div>
               <dt>최종 산출물</dt>
               <dd>{plan.project.final_outputs}</dd>
             </div>
-            <div>
-              <dt>제약조건</dt>
-              <dd>{plan.project.constraints}</dd>
-            </div>
           </dl>
         </div>
         <div className="pbl-summary-tags">
           <div className="pbl-project-facts">
-            <span>환경 <strong>{plan.project.environment_type}</strong></span>
-            <span>기간 <strong>{plan.project.duration_label}</strong></span>
             <span>난이도 <strong>{plan.project.difficulty_label}</strong></span>
-            <span>미션 <strong>{plan.missions.length}개</strong></span>
+            <span>예상 기간 <strong>{plan.project.duration_label}</strong></span>
+            <span>모바일 미션 <strong>{deviceCounts.mobile}개</strong></span>
+            <span>PC 미션 <strong>{deviceCounts.pc}개</strong></span>
+            <span>총 미션 <strong>{plan.missions.length}개</strong></span>
           </div>
-          <span>생성된 시트</span>
+          <span>미션 목록 요약</span>
           <div>
-            {plan.excelWorkbook.sheets.map((sheet) => <Tag key={sheet.sheetName}>{sheet.sheetName}</Tag>)}
+            {plan.missions.map((mission) => (
+              <Tag key={mission.mission_id}>{mission.mission_order}. {mission.title}</Tag>
+            ))}
           </div>
         </div>
       </div>
@@ -183,51 +251,236 @@ export function PblPlanResult({ plan, subjectName, techItems, historyCount, onPl
         className="pbl-draft-alert"
         type="info"
         showIcon
-        message="AI가 생성한 PBL 콘텐츠 초안입니다. 학생 노출 문구, 내부 메모, 모바일 수행성, 보안 제약을 검토해주세요."
+        message="AI가 생성한 PBL 콘텐츠 초안입니다. 학생 노출 문구와 수행 흐름을 먼저 검토한 뒤, 내부 메모는 기획자 검토 탭에서 확인해주세요."
       />
 
-      <Tabs
-        className="result-view-tabs"
-        defaultActiveKey="learning-preview"
-        items={[
-          {
-            key: 'learning-preview',
-            label: '모바일/PC 미리보기',
-            children: <PblPreviewPanel plan={plan} />,
-          },
-          {
-            key: 'workbook',
-            label: '워크북',
-            children: (
-              <Tabs
-                className="workbook-tabs"
-                activeKey={activeTabKey}
-                onChange={setActiveSheetName}
-                items={plan.excelWorkbook.sheets.map((sheet) => ({
-                  key: sheet.sheetName,
-                  label: getWorkbookTabLabel(sheet.sheetName),
-                  children: (
-                    <WorkbookSheetPane
-                      plan={plan}
-                      sheet={sheet}
-                      techItems={techItems}
-                      answerGuideGeneratingTarget={answerGuideGeneratingTarget}
-                      onPlanUpdated={handlePlanUpdated}
-                      onGenerateAnswerGuide={handleGenerateAnswerGuide}
-                    />
-                  ),
-                }))}
-              />
-            ),
-          },
-          {
-            key: 'json-preview',
-            label: 'JSON 미리보기',
-            children: <JsonPreviewPane plan={plan} />,
-          },
-        ]}
-      />
+      <details className="pbl-collapsible-preview">
+        <summary>모바일/PC 학습 화면 미리보기</summary>
+        <PblPreviewPanel plan={plan} />
+      </details>
+    </div>
+  )
+}
 
+function MissionDetailTab({ plan }: { plan: PblPlan }) {
+  return (
+    <div className="mission-detail-pane">
+      {plan.missions.map((mission) => (
+        <article className="mission-detail-card" key={mission.mission_id}>
+          <header>
+            <span>미션 {mission.mission_order}</span>
+            <h3>{mission.title}</h3>
+            <p>{mission.mission_overview}</p>
+          </header>
+
+          <dl className="mission-public-grid">
+            <div>
+              <dt>학습 목표</dt>
+              <dd>{mission.learning_goal}</dd>
+            </div>
+            <div>
+              <dt>권장 학습 시간</dt>
+              <dd>{mission.estimated_time}</dd>
+            </div>
+            <div>
+              <dt>제약 조건</dt>
+              <dd>{mission.constraints}</dd>
+            </div>
+            <div>
+              <dt>제출물</dt>
+              <dd>{mission.student_outputs}</dd>
+            </div>
+          </dl>
+
+          <section className="mission-steps-summary" aria-label={`${mission.title} Step 목록`}>
+            <div className="mission-section-heading">
+              <span>Step 목록</span>
+            </div>
+            <ol>
+              {mission.steps.map((step) => {
+                const datasetHints = getStepDatasetHints(step)
+                return (
+                  <li key={step.step_id}>
+                    <strong>Step {step.step_order}: {step.title}</strong>
+                    {datasetHints.length > 0 && (
+                      <p>활용 가능 데이터셋: {datasetHints.join(', ')}</p>
+                    )}
+                  </li>
+                )
+              })}
+            </ol>
+          </section>
+
+          <AiUsageGuideBlock mission={mission} />
+          <MissionSubmissionBlock mission={mission} />
+          <MissionReferenceBlock mission={mission} />
+
+          <details className="planner-hidden-details">
+            <summary>Step 상세 정보와 내부 검토 항목 보기</summary>
+            <div className="planner-hidden-list">
+              {mission.steps.map((step) => (
+                <article key={step.step_id}>
+                  <div>
+                    <span>{step.block_type}</span>
+                    <strong>{step.title}</strong>
+                  </div>
+                  <dl className="json-detail-grid">
+                    <div>
+                      <dt>학생 안내</dt>
+                      <dd>{step.learner_text || step.body || '내용 없음'}</dd>
+                    </div>
+                    <div>
+                      <dt>수행 방식</dt>
+                      <dd>{step.learner_action}</dd>
+                    </div>
+                    <div>
+                      <dt>완료 규칙</dt>
+                      <dd>{step.completion_rule}</dd>
+                    </div>
+                    <div>
+                      <dt>예상 답안/기대 기준</dt>
+                      <dd>{step.expected_answer_text || '별도 기준 없음'}</dd>
+                    </div>
+                    <div>
+                      <dt>기획자 메모</dt>
+                      <dd>{step.planner_note}</dd>
+                    </div>
+                    <div>
+                      <dt>개발 메모</dt>
+                      <dd>{step.developer_note}</dd>
+                    </div>
+                  </dl>
+                </article>
+              ))}
+            </div>
+          </details>
+        </article>
+      ))}
+    </div>
+  )
+}
+
+function PlannerReviewTab({
+  plan,
+  techItems,
+  answerGuideGeneratingTarget,
+  onPlanUpdated,
+  onGenerateAnswerGuide,
+}: {
+  plan: PblPlan
+  techItems: TechItem[]
+  answerGuideGeneratingTarget: 'all' | number | null
+  onPlanUpdated: (plan: PblPlan, changeSummary?: string) => void
+  onGenerateAnswerGuide: (targetMissionIndex?: number) => Promise<void>
+}) {
+  return (
+    <div className="planner-review-pane">
+      <article className="planner-review-card">
+        <div className="mission-section-heading">
+          <span>프로젝트 기획 메모</span>
+        </div>
+        <dl className="json-detail-grid">
+          <div>
+            <dt>최종 성적 산출 방식</dt>
+            <dd>{summarizeFinalEvaluation(plan)}</dd>
+          </div>
+          <div>
+            <dt>프로젝트 난이도 설정 이유</dt>
+            <dd>{plan.project.planner_note}</dd>
+          </div>
+          <div>
+            <dt>모바일/PC 분리 기준</dt>
+            <dd>{plan.project.pc_alternative}</dd>
+          </div>
+          <div>
+            <dt>개발 구현 메모</dt>
+            <dd>{plan.project.developer_note}</dd>
+          </div>
+        </dl>
+      </article>
+
+      <ValidationChecklistList plan={plan} techItems={techItems} onPlanUpdated={onPlanUpdated} />
+      <MissionDetailList
+        plan={plan}
+        techItems={techItems}
+        answerGuideGeneratingTarget={answerGuideGeneratingTarget}
+        onPlanUpdated={onPlanUpdated}
+        onGenerateAnswerGuide={onGenerateAnswerGuide}
+      />
+    </div>
+  )
+}
+
+function ExcelJsonDataTab({
+  plan,
+  techItems,
+  activeSheetName,
+  onSheetChange,
+  answerGuideGeneratingTarget,
+  onPlanUpdated,
+  onGenerateAnswerGuide,
+}: {
+  plan: PblPlan
+  techItems: TechItem[]
+  activeSheetName: string
+  onSheetChange: (sheetName: string) => void
+  answerGuideGeneratingTarget: 'all' | number | null
+  onPlanUpdated: (plan: PblPlan, changeSummary?: string) => void
+  onGenerateAnswerGuide: (targetMissionIndex?: number) => Promise<void>
+}) {
+  return (
+    <Tabs
+      className="workbook-tabs"
+      defaultActiveKey="excel-workbook"
+      items={[
+        {
+          key: 'excel-workbook',
+          label: 'Excel workbook',
+          children: (
+            <Tabs
+              className="workbook-tabs"
+              activeKey={activeSheetName}
+              onChange={onSheetChange}
+              items={plan.excelWorkbook.sheets.map((sheet) => ({
+                key: sheet.sheetName,
+                label: getWorkbookTabLabel(sheet.sheetName),
+                children: (
+                  <WorkbookSheetPane
+                    plan={plan}
+                    sheet={sheet}
+                    techItems={techItems}
+                    answerGuideGeneratingTarget={answerGuideGeneratingTarget}
+                    onPlanUpdated={onPlanUpdated}
+                    onGenerateAnswerGuide={onGenerateAnswerGuide}
+                  />
+                ),
+              }))}
+            />
+          ),
+        },
+        {
+          key: 'json-preview',
+          label: 'JSON 미리보기',
+          children: <JsonPreviewPane plan={plan} />,
+        },
+      ]}
+    />
+  )
+}
+
+function AnswerGuideTab({
+  plan,
+  answerGuideError,
+  answerGuideGeneratingTarget,
+  onGenerateAnswerGuide,
+}: {
+  plan: PblPlan
+  answerGuideError: string | null
+  answerGuideGeneratingTarget: 'all' | number | null
+  onGenerateAnswerGuide: (targetMissionIndex?: number) => Promise<void>
+}) {
+  return (
+    <div className="answer-guide-tab">
       <section className="answer-guide-actions" aria-label="예상 답안 생성">
         <div>
           <span>기획자용 예상 답안</span>
@@ -239,17 +492,173 @@ export function PblPlanResult({ plan, subjectName, techItems, historyCount, onPl
           icon={<FileTextOutlined />}
           loading={answerGuideGeneratingTarget === 'all'}
           disabled={answerGuideGeneratingTarget !== null}
-          onClick={() => void handleGenerateAnswerGuide()}
+          onClick={() => void onGenerateAnswerGuide()}
         >
           {answerGuideGeneratingTarget === 'all' ? '예상 답안을 생성하는 중이에요.' : '예상 답안 생성'}
         </Button>
       </section>
 
       {answerGuideError && <Alert className="refine-error-alert" type="error" showIcon message={answerGuideError} />}
-
       <AnswerGuidePanel answerGuides={plan.answerGuides} />
+    </div>
+  )
+}
+
+function AiUsageGuideBlock({ mission }: { mission: Mission }) {
+  const guide = getAiUsageGuide(mission)
+
+  return (
+    <section className="mission-ai-guide" aria-label={`${mission.title} 생성형 AI 활용 가이드`}>
+      <div className="mission-section-heading">
+        <span>생성형 AI 활용 가이드</span>
+      </div>
+      <details>
+        <summary>허용되는 활용</summary>
+        <BulletList items={guide.allowed} />
+      </details>
+      <details>
+        <summary>금지되는 활용</summary>
+        <BulletList items={guide.prohibited} />
+      </details>
+      <details>
+        <summary>AI 활용 시 반드시 지켜야 할 원칙</summary>
+        <BulletList items={guide.principles} />
+      </details>
     </section>
   )
+}
+
+function MissionSubmissionBlock({ mission }: { mission: Mission }) {
+  return (
+    <section className="mission-submission-summary" aria-label={`${mission.title} 제출물과 평가 기준`}>
+      <div className="mission-section-heading">
+        <span>제출물 및 평가 기준</span>
+      </div>
+      <dl className="mission-public-grid">
+        <div>
+          <dt>제출물</dt>
+          <dd>{mission.submission.submission_title}</dd>
+        </div>
+        <div>
+          <dt>제출 안내</dt>
+          <dd>{mission.submission.student_instruction}</dd>
+        </div>
+        <div>
+          <dt>제출물 평가 기준</dt>
+          <dd>{mission.submission.evaluation_text}</dd>
+        </div>
+        <div>
+          <dt>PASS 기준</dt>
+          <dd>{mission.submission.pass_criteria}</dd>
+        </div>
+      </dl>
+    </section>
+  )
+}
+
+function MissionReferenceBlock({ mission }: { mission: Mission }) {
+  const references = [
+    mission.prerequisites && `선수 지식: ${mission.prerequisites}`,
+    mission.tech_stack && `활용 기술: ${mission.tech_stack}`,
+  ].filter(Boolean) as string[]
+
+  if (references.length === 0) return null
+
+  return (
+    <section className="mission-reference-summary" aria-label={`${mission.title} 참고 자료`}>
+      <div className="mission-section-heading">
+        <span>참고 자료</span>
+      </div>
+      <BulletList items={references} />
+    </section>
+  )
+}
+
+function BulletList({ items }: { items: string[] }) {
+  return (
+    <ul>
+      {items.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}
+    </ul>
+  )
+}
+
+function getMissionDeviceCounts(plan: PblPlan) {
+  return plan.missions.reduce(
+    (counts, mission) => {
+      const hasMobile = mission.has_mobile_alternative
+        || mission.steps.some((step) => step.mobile_visible !== false && (step.device_target || step.required_device) !== 'pc')
+      const hasPc = mission.is_pc_required
+        || mission.steps.some((step) => step.pc_visible !== false && (step.device_target || step.required_device) !== 'mobile')
+
+      return {
+        mobile: counts.mobile + (hasMobile ? 1 : 0),
+        pc: counts.pc + (hasPc ? 1 : 0),
+      }
+    },
+    { mobile: 0, pc: 0 },
+  )
+}
+
+function getAiUsageGuide(mission: Mission) {
+  return {
+    allowed: toList(mission.ai_usage_guide?.allowed, [
+      '데이터셋 탐색 지원',
+      '오류 원인 분석',
+      '코드 구조 개선 조언',
+      '평가 지표 개념 설명',
+      '발표 자료 구성 조언',
+    ]),
+    prohibited: toList(mission.ai_usage_guide?.prohibited, [
+      '보고서 전체 작성 요청',
+      '전체 코드 작성 요청',
+      '테스트 결과 조작',
+      '평가 기준에 맞춰 결과를 그럴듯하게 꾸미는 요청',
+      '팀원 기여도 또는 회고록 대리 작성',
+    ]),
+    principles: toList(mission.ai_usage_guide?.principles, [
+      'AI 답변은 반드시 검증한다.',
+      '최종 산출물은 학습자가 직접 수정·작성한다.',
+      'AI 활용 내역을 보고서에 명시한다.',
+      '코드와 결과를 팀원이 설명할 수 있어야 한다.',
+    ]),
+  }
+}
+
+function toList(value: unknown, fallback: string[]) {
+  return Array.isArray(value) && value.length
+    ? value.map((item) => String(item).trim()).filter(Boolean)
+    : fallback
+}
+
+function getStepDatasetHints(step: Step) {
+  const source = [
+    step.learner_text,
+    step.body,
+    step.question,
+    step.mobile_summary,
+    step.pc_detail,
+    step.expected_output,
+  ]
+    .filter(Boolean)
+    .join('\n')
+
+  return source
+    .split(/\n|,|;/)
+    .map((item) => item.trim())
+    .filter((item) => /데이터셋|공개 데이터|가상 데이터|샘플 데이터|Kaggle|UCI|CCTV|센서/.test(item))
+    .slice(0, 4)
+}
+
+function summarizeFinalEvaluation(plan: PblPlan) {
+  const submissionCriteria = plan.missions
+    .map((mission) => `${mission.title}: ${mission.submission.pass_criteria}`)
+    .join('\n')
+  return [
+    'PASS: 핵심 평가 항목을 모두 충족',
+    '조건부 PASS: 핵심 항목은 충족했으나 일부 보완 필요',
+    'FAIL: 핵심 항목 중 하나 이상 미충족',
+    submissionCriteria,
+  ].filter(Boolean).join('\n')
 }
 
 function JsonPreviewPane({ plan }: { plan: PblPlan }) {

@@ -67,10 +67,17 @@ export type Mission = {
   prerequisites: string
   tech_stack: string
   constraints: string
+  ai_usage_guide?: AiUsageGuide
   is_pc_required: boolean
   has_mobile_alternative: boolean
   steps: Step[]
   submission: Submission
+}
+
+export type AiUsageGuide = {
+  allowed: string[]
+  prohibited: string[]
+  principles: string[]
 }
 
 export type Step = {

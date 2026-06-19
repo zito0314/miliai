@@ -119,6 +119,12 @@ export const submissionSchema = z.object({
   developer_note: z.string(),
 })
 
+const aiUsageGuideSchema = z.object({
+  allowed: z.array(z.string()),
+  prohibited: z.array(z.string()),
+  principles: z.array(z.string()),
+})
+
 export const missionSchema = z.object({
   project_id: z.string(),
   mission_id: z.string(),
@@ -135,6 +141,7 @@ export const missionSchema = z.object({
   prerequisites: z.string(),
   tech_stack: z.string(),
   constraints: z.string(),
+  ai_usage_guide: aiUsageGuideSchema.optional(),
   is_pc_required: z.boolean(),
   has_mobile_alternative: z.boolean(),
   steps: z.array(stepSchema).min(3),
@@ -343,6 +350,18 @@ const blockTypeToLearningRole = {
 }
 const optionInputTypes = new Set(['single_choice', 'multi_choice', 'multiple_choice', 'matching', 'sequence_sort', 'sequence_order', 'code_fill_blank', 'code_error_finding', 'result_prediction', 'checklist', 'self_checklist', 'peer_review_request', 'peer_review'])
 const optionBlockTypes = new Set(['single_choice', 'multiple_choice', 'sequence_order', 'code_fill_blank', 'code_error_finding', 'result_prediction', 'self_checklist'])
+const pblDifficultyGuide = [
+  '레벨 1 / 초급 / 기본 코딩 실습 / 평가기준 불가',
+  '레벨 2 / 초급 / 단일 알고리즘 구현 / 평가기준 불가',
+  '레벨 3 / 초급 / 데이터 분석 / 평가기준 불가',
+  '레벨 4 / 중급 / 단일 AI 모델 학습 / 평가기준 일부 포함',
+  '레벨 5 / 중급 / 웹/앱 + AI 연결 / 평가기준 일부 포함',
+  '레벨 6 / 중급 / 단일 데이터 기반 AI 서비스 / CCTV만 분석',
+  '레벨 7 / 고급 / 실시간 AI 시스템 / 실시간 영상 탐지',
+  '레벨 8 / 고급 / 멀티모달 AI + 운영 시스템 / 현재 프로젝트 최소 목표',
+  '레벨 9 / 고급 / 현장 적용 가능한 AI 서비스 / 권장 최종 목표',
+  '레벨 10 / 마스터 / 대규모 상용·군 운용 체계 / 범위 초과',
+].join('\n')
 
 export default async function handler(request, response) {
   if (request.method !== 'POST') {
@@ -634,7 +653,7 @@ ${referenceBrief}
     "environment_type": "모바일 중심 + PC 검증형",
     "duration_label": "예: 3주 / 모바일 세션 + PC 검증",
     "target_learner": "AI 활용 경험이 많지 않은 군 장병",
-    "difficulty_label": "3~4레벨",
+    "difficulty_label": "3레벨(초급)~4레벨(중급)",
     "project_goal": "최종 학습 목표",
     "learning_mode": "모바일 카드 활동, AI 교관 질문, PC 검증",
     "prerequisites": "선수 지식",
@@ -653,6 +672,11 @@ ${referenceBrief}
       "core_learning_action": "핵심 행동",
       "student_outputs": "학생 산출물",
       "estimated_time": "예: 20~30분",
+      "ai_usage_guide": {
+        "allowed": ["데이터셋 탐색 지원", "오류 원인 분석", "코드 구조 개선 조언"],
+        "prohibited": ["보고서 전체 작성 요청", "전체 코드 작성 요청", "테스트 결과 조작"],
+        "principles": ["AI 답변은 반드시 검증한다", "최종 산출물은 학습자가 직접 수정·작성한다", "AI 활용 내역을 보고서에 명시한다"]
+      },
       "scenario_focus": "군 실무 문제 상황",
       "step_focus": ["상황 이해", "판단 기준 선택", "해결 순서 조립", "모바일 검토", "간단 제출"]
     },
@@ -663,11 +687,23 @@ ${referenceBrief}
       "core_learning_action": "핵심 행동",
       "student_outputs": "학생 산출물",
       "estimated_time": "예: 30~40분",
+      "ai_usage_guide": {
+        "allowed": ["평가 지표 개념 설명", "발표 자료 구성 조언", "검증 절차 점검"],
+        "prohibited": ["제출물 대리 작성", "결과를 그럴듯하게 꾸미는 요청", "팀원 기여도 대리 작성"],
+        "principles": ["코드와 결과를 팀원이 설명할 수 있어야 한다", "AI 제안은 실험 결과로 검증한다", "보안 민감 정보는 입력하지 않는다"]
+      },
       "scenario_focus": "검증과 제출 상황",
       "step_focus": ["개념 확인", "오류 원인 찾기", "결과 예측", "PC 검증", "최종 제출"]
     }
   ]
 }
+
+난이도는 아래 기준을 따른다.
+${pblDifficultyGuide}
+일반 장병 대상 PBL은 기본적으로 3~6레벨 사이에서 생성한다.
+실전형 고급 프로젝트는 7~9레벨까지 허용한다.
+레벨 10은 범위 초과이므로 생성하지 않는다.
+표기는 반드시 숫자 레벨과 구분명을 함께 쓴다. 예: 5레벨(중급), 8레벨(고급).
 
 missions는 정확히 2개만 반환한다.
 모든 문자열은 한국어로 구체적으로 작성한다.`
@@ -718,6 +754,11 @@ ${stepPattern}
   "estimated_time": "예: 20~30분",
   "core_learning_action": "핵심 행동",
   "student_outputs": "학생 산출물",
+  "ai_usage_guide": {
+    "allowed": ["데이터셋 탐색 지원", "오류 원인 분석", "평가 지표 개념 설명"],
+    "prohibited": ["보고서 전체 작성 요청", "전체 코드 작성 요청", "테스트 결과 조작"],
+    "principles": ["AI 답변은 반드시 검증한다", "최종 산출물은 학습자가 직접 수정·작성한다", "AI 활용 내역을 보고서에 명시한다"]
+  },
   "planner_review_points": "기획자 검토 포인트",
   "developer_note": "개발 구현 메모",
   "mission_overview": "미션 설명",
@@ -766,6 +807,8 @@ ${stepPattern}
 }
 
 JSON에 project, ui_blocks, environment_tags, validation_checklist, excelWorkbook은 포함하지 않는다.
+생성형 AI 활용 가이드는 allowed, prohibited, principles 3개 배열로 나눠 작성한다.
+정답, expected_answer_text, completion_rule, planner_note, developer_note는 학생용 기본 화면에 노출될 문구가 아니라 내부 검토/평가용 문구로 작성한다.
 모든 문자열은 한국어로 작성한다.`
 }
 
@@ -985,7 +1028,7 @@ function normalizeProject(value, fallbackSubjectName) {
     environment_type: asString(rawProject.environment_type, '모바일 중심 + PC 검증형'),
     duration_label: asString(rawProject.duration_label, '4주 / 모바일 세션 8회(회당 15~25분) + PC 검증 세션 2회(회당 60분)'),
     target_learner: asString(rawProject.target_learner, 'AI 활용 경험이 많지 않은 군 장병'),
-    difficulty_label: asString(rawProject.difficulty_label, '3~4레벨'),
+    difficulty_label: asString(rawProject.difficulty_label, '3레벨(초급)~4레벨(중급)'),
     project_goal: asString(rawProject.project_goal, '비식별 또는 가상 데이터를 바탕으로 실무 문제를 정의하고 개선안을 제안합니다.'),
     learning_mode: asString(rawProject.learning_mode, '모바일 카드 활동, AI 교관 질문, 동료 피드백, PC 검증 실습을 병행합니다.'),
     prerequisites: asString(rawProject.prerequisites, '기본 문서 작성, 표 데이터 읽기, 생성형 AI 활용 원칙'),
@@ -1027,10 +1070,37 @@ function normalizeMission(value, project, index) {
     prerequisites: asString(rawMission.prerequisites, project.prerequisites),
     tech_stack: asString(rawMission.tech_stack, project.tech_stack),
     constraints: asString(rawMission.constraints, project.constraints),
+    ai_usage_guide: normalizeAiUsageGuide(rawMission.ai_usage_guide),
     is_pc_required: typeof rawMission.is_pc_required === 'boolean' ? rawMission.is_pc_required : steps.some((step) => step.required_device === 'pc'),
     has_mobile_alternative: typeof rawMission.has_mobile_alternative === 'boolean' ? rawMission.has_mobile_alternative : true,
     steps,
     submission: normalizeSubmission(rawMission.submission, project.project_id, missionId, index),
+  }
+}
+
+function normalizeAiUsageGuide(value) {
+  const guide = asObject(value)
+  return {
+    allowed: normalizeStringArray(guide.allowed, [
+      '데이터셋 탐색 지원',
+      '오류 원인 분석',
+      '코드 구조 개선 조언',
+      '평가 지표 개념 설명',
+      '발표 자료 구성 조언',
+    ], 3, 5),
+    prohibited: normalizeStringArray(guide.prohibited, [
+      '보고서 전체 작성 요청',
+      '전체 코드 작성 요청',
+      '테스트 결과 조작',
+      '평가 기준에 맞춰 결과를 그럴듯하게 꾸미는 요청',
+      '팀원 기여도 또는 회고록 대리 작성',
+    ], 3, 5),
+    principles: normalizeStringArray(guide.principles, [
+      'AI 답변은 반드시 검증한다.',
+      '최종 산출물은 학습자가 직접 수정·작성한다.',
+      'AI 활용 내역을 보고서에 명시한다.',
+      '코드와 결과를 팀원이 설명할 수 있어야 한다.',
+    ], 3, 4),
   }
 }
 
@@ -1459,11 +1529,19 @@ function buildMissionRows(missions) {
     'prerequisites',
     'tech_stack',
     'constraints',
+    'ai_usage_allowed',
+    'ai_usage_prohibited',
+    'ai_usage_principles',
     'is_pc_required',
     'has_mobile_alternative',
   ]
 
-  return [header, ...missions.map((mission) => header.map((key) => toCell(mission[key])))]
+  return [header, ...missions.map((mission) => header.map((key) => {
+    if (key === 'ai_usage_allowed') return toCell(mission.ai_usage_guide?.allowed)
+    if (key === 'ai_usage_prohibited') return toCell(mission.ai_usage_guide?.prohibited)
+    if (key === 'ai_usage_principles') return toCell(mission.ai_usage_guide?.principles)
+    return toCell(mission[key])
+  }))]
 }
 
 function buildStepRows(missions) {
@@ -1876,8 +1954,67 @@ URL 문서는 콘텐츠 구조, 작성 기준, 출력 규칙을 참고하기 위
 
 * submission은 각 mission 내부의 missions[].submission으로 작성한다.
 * options는 각 step 내부의 missions[].steps[].options로 작성한다.
+* 생성형 AI 활용 가이드는 각 mission 내부의 missions[].ai_usage_guide로 작성한다.
 * ui_blocks와 environment_tags는 기본 사전 구조를 따르되, 프로젝트와 미션에 맞는 값으로 구성한다.
 * excelWorkbook은 생성하지 않는다.
+
+---
+
+[난이도 기준]
+
+PBL템플릿예시_260612.xlsx의 과제난이도 시트를 기준으로 아래 난이도 표를 따른다.
+
+${pblDifficultyGuide}
+
+작성 규칙:
+
+* 일반 장병 대상 PBL은 기본적으로 3~6레벨 사이에서 생성한다.
+* 실전형 고급 프로젝트는 7~9레벨까지 허용한다.
+* 레벨 10은 현재 콘텐츠 생성 범위 초과로 간주하고 생성하지 않는다.
+* project.difficulty_label은 숫자 레벨과 구분명을 함께 쓴다. 예: 5레벨(중급), 8레벨(고급)
+
+---
+
+[학생용 / 기획자용 분리 기준]
+
+생성 결과는 학생/사용자에게 보여줄 내용과 기획자 검토용 내용을 반드시 분리한다.
+
+학생용 내용은 간결하고 수행 중심으로 작성한다.
+기획자용 내용은 왜 이렇게 설계했는지, 평가 기준은 무엇인지, 학습자가 어디서 어려움을 겪을 수 있는지를 설명한다.
+
+결과 화면 기본 노출 항목은 프로젝트 개요, 미션, Step, 제출물, 생성형 AI 활용 가이드, 제출물 평가 기준, 참고 자료로 제한한다.
+정답, 예상 답안, completion_rule, planner_note, developer_note는 기본 노출하지 않고 기획자 전용 영역에만 포함한다.
+
+우선 생성 구조:
+
+1. 프로젝트 개요
+2. 미션 목록
+3. 각 미션별 Step 요약
+4. 제출물
+5. 생성형 AI 활용 가이드
+6. 제출물 평가 기준
+7. 참고 자료
+8. 기획자 전용 메모
+
+---
+
+[생성형 AI 활용 가이드]
+
+각 mission에는 ai_usage_guide를 포함한다.
+
+형태:
+
+{
+  "allowed": ["허용되는 활용"],
+  "prohibited": ["금지되는 활용"],
+  "principles": ["AI 활용 시 반드시 지켜야 할 원칙"]
+}
+
+가이드에는 아래 관점을 반영한다.
+
+* 허용: 데이터셋 탐색 지원, 오류 원인 분석, 코드 구조 개선 조언, 평가 지표 개념 설명, 발표 자료 구성 조언
+* 금지: 보고서 전체 작성 요청, 전체 코드 작성 요청, 테스트 결과 조작, 평가 기준에 맞춰 결과를 꾸미는 요청, 팀원 기여도 또는 회고록 대리 작성
+* 원칙: AI 답변 검증, 학습자 직접 수정/작성, AI 활용 내역 명시, 코드와 결과를 팀원이 설명 가능해야 함
 
 ---
 
@@ -2040,6 +2177,9 @@ options는 아래 필드를 우선 사용한다.
 * project.planner_note
 * project.developer_note
 * missions[].planner_review_points
+* missions[].ai_usage_guide.allowed
+* missions[].ai_usage_guide.prohibited
+* missions[].ai_usage_guide.principles
 * missions[].developer_note
 * missions[].steps[].planner_note
 * missions[].steps[].developer_note
@@ -2148,6 +2288,7 @@ ID, 순서, 누락 필드, options_ref, expected_answer_ref, workbook 변환은 
 * 첨부된 기준 문서의 유의사항을 반영했는가
 * project, missions, steps, options, submission 구조가 있는가
 * 학생 노출 문구와 내부 메모가 분리되어 있는가
+* 각 미션에 생성형 AI 활용 가이드 allowed/prohibited/principles가 있는가
 * 모바일 수행성과 PC 검증 여부가 표시되어 있는가
 * 선택형 step에 options가 있는가
 * 기대 답안이 필요한 step에 expected_answer_text가 있는가

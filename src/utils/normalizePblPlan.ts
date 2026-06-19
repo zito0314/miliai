@@ -153,7 +153,7 @@ function normalizeProject(project: Project): Project {
     environment_type: asString(project?.environment_type, '모바일 중심 + PC 검증형'),
     duration_label: asString(project?.duration_label, '4주 / 모바일 세션 8회(회당 15~25분) + PC 검증 세션 2회(회당 60분)'),
     target_learner: asString(project?.target_learner, 'AI 활용 경험이 많지 않은 군 장병'),
-    difficulty_label: asString(project?.difficulty_label, '3~4레벨'),
+    difficulty_label: asString(project?.difficulty_label, '3레벨(초급)~4레벨(중급)'),
     project_goal: asString(project?.project_goal, '비식별 또는 가상 데이터를 바탕으로 실무 문제를 정의하고 개선안을 제안합니다.'),
     learning_mode: asString(project?.learning_mode, '모바일 카드 활동, AI 교관 질문, 동료 피드백, PC 검증 실습을 병행합니다.'),
     prerequisites: asString(project?.prerequisites, '기본 문서 작성, 표 데이터 읽기, 생성형 AI 활용 원칙'),
@@ -199,10 +199,40 @@ function normalizeMission(mission: Mission | undefined, project: Project, index:
     prerequisites: asString(mission?.prerequisites, project.prerequisites),
     tech_stack: asString(mission?.tech_stack, project.tech_stack),
     constraints: asString(mission?.constraints, project.constraints),
+    ai_usage_guide: normalizeAiUsageGuide(mission?.ai_usage_guide),
     is_pc_required: typeof mission?.is_pc_required === 'boolean' ? mission.is_pc_required : steps.some((step) => step.required_device === 'pc'),
     has_mobile_alternative: typeof mission?.has_mobile_alternative === 'boolean' ? mission.has_mobile_alternative : true,
     steps,
     submission: normalizeSubmission(mission?.submission, project.project_id, missionId, index),
+  }
+}
+
+function normalizeAiUsageGuide(value: unknown) {
+  const guide = value && typeof value === 'object' && !Array.isArray(value)
+    ? value as { allowed?: unknown; prohibited?: unknown; principles?: unknown }
+    : {}
+
+  return {
+    allowed: normalizeStringArray(guide.allowed, [
+      '데이터셋 탐색 지원',
+      '오류 원인 분석',
+      '코드 구조 개선 조언',
+      '평가 지표 개념 설명',
+      '발표 자료 구성 조언',
+    ], 3, 5),
+    prohibited: normalizeStringArray(guide.prohibited, [
+      '보고서 전체 작성 요청',
+      '전체 코드 작성 요청',
+      '테스트 결과 조작',
+      '평가 기준에 맞춰 결과를 그럴듯하게 꾸미는 요청',
+      '팀원 기여도 또는 회고록 대리 작성',
+    ], 3, 5),
+    principles: normalizeStringArray(guide.principles, [
+      'AI 답변은 반드시 검증한다.',
+      '최종 산출물은 학습자가 직접 수정·작성한다.',
+      'AI 활용 내역을 보고서에 명시한다.',
+      '코드와 결과를 팀원이 설명할 수 있어야 한다.',
+    ], 3, 4),
   }
 }
 
@@ -529,6 +559,16 @@ function normalizeStringArrayOrUndefined(value: unknown) {
     ? value.map((item) => asString(item, '')).filter(Boolean)
     : []
   return normalized.length ? normalized : undefined
+}
+
+function normalizeStringArray(value: unknown, fallbackItems: string[], minimum = 1, maximum = Infinity) {
+  const normalized = Array.isArray(value)
+    ? value.map((item) => asString(item, '')).filter(Boolean)
+    : []
+  const source = normalized.length ? normalized : fallbackItems
+  const count = Math.min(maximum, Math.max(minimum, source.length))
+
+  return Array.from({ length: count }, (_, index) => source[index % source.length])
 }
 
 function fallbackSectionForBlockType(blockType: PblBlockType, index: number) {
