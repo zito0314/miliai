@@ -205,6 +205,7 @@ export function PblGenerator({ techItems, isTechItemsLoading, onLoadTechItems }:
           <label className="pbl-generator-field pbl-subject-field">
             <span>과목명/주제</span>
             <Input
+              size="large"
               value={subjectName}
               placeholder="예: 데이터 기반 조달 및 소요예측"
               aria-label="PBL 과목명"
