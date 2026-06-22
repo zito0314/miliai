@@ -94,7 +94,10 @@ export function PblPreviewPanel({ plan }: PblPreviewPanelProps) {
         </div>
         <Segmented
           value={deviceMode}
-          onChange={(value) => setDeviceMode(value as PreviewDeviceMode)}
+          onChange={(value) => {
+            setDeviceMode(value as PreviewDeviceMode)
+            setSelectedStepId('')
+          }}
           options={[
             { label: <span><MobileOutlined /> 모바일</span>, value: 'mobile' },
             { label: <span><DesktopOutlined /> PC</span>, value: 'pc' },
@@ -113,7 +116,9 @@ export function PblPreviewPanel({ plan }: PblPreviewPanelProps) {
               setActiveProjectId(projectId)
               const nextProject = previewContent.projects.find((project) => project.project_id === projectId)
               setActiveMissionId(nextProject?.missions[0]?.mission_id || '')
+              setSelectedStepId('')
             }}
+            popupMatchSelectWidth
             options={previewContent.projects.map((project) => ({
               value: project.project_id,
               label: project.title,
@@ -124,7 +129,12 @@ export function PblPreviewPanel({ plan }: PblPreviewPanelProps) {
           <span>미션</span>
           <Select
             value={activeMission.mission_id}
-            onChange={setActiveMissionId}
+            onChange={(missionId) => {
+              setActiveMissionId(missionId)
+              setSelectedStepId('')
+            }}
+            popupMatchSelectWidth
+            listHeight={320}
             options={activeProject.missions.map((mission) => ({
               value: mission.mission_id,
               label: (
@@ -158,7 +168,10 @@ export function PblPreviewPanel({ plan }: PblPreviewPanelProps) {
           <MobilePreviewLayout
             mission={activeMission}
             previewSteps={previewSteps}
+            selectedStep={selectedStep}
+            selectedStepId={effectiveSelectedStepId}
             responses={responses}
+            onSelectStep={setSelectedStepId}
             onResponseChange={handleResponseChange}
           />
         )}
@@ -214,31 +227,48 @@ function ValidationSummary({
 function MobilePreviewLayout({
   mission,
   previewSteps,
+  selectedStep,
+  selectedStepId,
   responses,
+  onSelectStep,
   onResponseChange,
 }: {
   mission: PreviewMission
   previewSteps: { step: PreviewStep; variant: PreviewDisplayVariant }[]
+  selectedStep?: PreviewStep
+  selectedStepId: string
   responses: Record<string, StepResponseValue>
+  onSelectStep: (stepId: string) => void
   onResponseChange: (stepId: string, value: StepResponseValue) => void
 }) {
   return (
-    <div className="pbl-preview-mobile-shell">
-      <MissionPreviewHeader mission={mission} />
-      <div className="pbl-preview-step-stack">
-        {previewSteps.map(({ step, variant }) => (
-          <StepPreviewCard
-            key={step.step_id}
-            mission={mission}
-            step={step}
-            variant={variant}
-            mode="mobile"
-            response={responses[step.step_id]}
-            onResponseChange={onResponseChange}
-          />
-        ))}
-        <SubmissionPreviewCard mission={mission} mode="mobile" />
+    <div className="pbl-preview-mobile-workspace">
+      <div className="pbl-preview-mobile-shell">
+        <MissionPreviewHeader mission={mission} />
+        <div className="pbl-preview-step-stack">
+          {previewSteps.map(({ step, variant }) => (
+            <StepPreviewCard
+              key={step.step_id}
+              mission={mission}
+              step={step}
+              variant={variant}
+              mode="mobile"
+              selected={step.step_id === selectedStepId}
+              response={responses[step.step_id]}
+              onSelectStep={onSelectStep}
+              onResponseChange={onResponseChange}
+            />
+          ))}
+          <SubmissionPreviewCard mission={mission} mode="mobile" />
+        </div>
       </div>
+      <StepReviewPanel
+        mode="mobile"
+        previewSteps={previewSteps}
+        selectedStep={selectedStep}
+        selectedStepId={selectedStepId}
+        onSelectStep={onSelectStep}
+      />
     </div>
   )
 }
@@ -260,6 +290,8 @@ function PcPreviewLayout({
   onSelectStep: (stepId: string) => void
   onResponseChange: (stepId: string, value: StepResponseValue) => void
 }) {
+  const hasDirectPcStep = previewSteps.some(({ variant }) => variant === 'full')
+
   return (
     <div className="pbl-preview-pc-shell">
       <aside className="pbl-preview-sidebar">
@@ -280,21 +312,135 @@ function PcPreviewLayout({
         </div>
       </aside>
       <main className="pbl-preview-pc-main">
+        {!hasDirectPcStep && mission.submission && <PcWorkAreaPanel mission={mission} />}
         {selectedStep ? (
-          <StepPreviewCard
-            mission={mission}
-            step={selectedStep}
-            variant={getPreviewDisplayVariant(selectedStep, 'pc')}
-            mode="pc"
-            response={responses[selectedStep.step_id]}
-            onResponseChange={onResponseChange}
-          />
-        ) : (
+          <>
+            <StepReviewPanel
+              mode="pc"
+              previewSteps={previewSteps}
+              selectedStep={selectedStep}
+              selectedStepId={selectedStepId}
+              onSelectStep={onSelectStep}
+            />
+            <StepPreviewCard
+              mission={mission}
+              step={selectedStep}
+              variant={getPreviewDisplayVariant(selectedStep, 'pc')}
+              mode="pc"
+              selected
+              response={responses[selectedStep.step_id]}
+              onSelectStep={onSelectStep}
+              onResponseChange={onResponseChange}
+            />
+          </>
+        ) : !mission.submission ? (
           <PreviewEmptyState mission={mission} />
+        ) : null}
+        {hasDirectPcStep && (
+          <SubmissionPreviewCard mission={mission} mode="pc" />
         )}
-        <SubmissionPreviewCard mission={mission} mode="pc" />
       </main>
     </div>
+  )
+}
+
+function StepReviewPanel({
+  mode,
+  previewSteps,
+  selectedStep,
+  selectedStepId,
+  onSelectStep,
+}: {
+  mode: PreviewDeviceMode
+  previewSteps: { step: PreviewStep; variant: PreviewDisplayVariant }[]
+  selectedStep?: PreviewStep
+  selectedStepId: string
+  onSelectStep: (stepId: string) => void
+}) {
+  if (!selectedStep) {
+    return (
+      <aside className="pbl-preview-review-panel">
+        <span>Step 검토</span>
+        <strong>표시할 Step이 없습니다.</strong>
+        <p>{mode === 'pc' ? 'PC에서는 제출/평가 단계로 이어집니다.' : '선택한 미션에 표시할 모바일 Step이 없습니다.'}</p>
+      </aside>
+    )
+  }
+
+  const variant = getPreviewDisplayVariant(selectedStep, mode)
+  const datasetHints = getPreviewStepDatasetHints(selectedStep)
+  const hasAnswer = hasStepAnswer(selectedStep)
+  const visibilityText = [
+    `모바일 ${getPreviewDisplayVariant(selectedStep, 'mobile') === 'hidden' ? '숨김' : '표시'}`,
+    `PC ${getPreviewDisplayVariant(selectedStep, 'pc') === 'hidden' ? '숨김' : '표시'}`,
+  ].join(' · ')
+
+  return (
+    <aside className="pbl-preview-review-panel">
+      <div>
+        <span>{mode === 'mobile' ? '모바일 Step 검토' : 'PC Step 검토'}</span>
+        <strong>Step {selectedStep.step_order}. {selectedStep.title}</strong>
+        <p>{selectedStep.learner_action || selectedStep.completion_rule || selectedStep.learner_text || '선택한 Step의 수행 정보를 검토합니다.'}</p>
+      </div>
+      <div className="pbl-preview-review-tags">
+        <Tag>{variant === 'summary' ? '요약 표시' : '직접 수행'}</Tag>
+        <Tag>{selectedStep.block_type}</Tag>
+        <Tag>{selectedStep.device_target}</Tag>
+        {selectedStep.learning_role && <Tag>{selectedStep.learning_role}</Tag>}
+        {hasAnswer && <Tag color="success">정답 있음</Tag>}
+        {!selectedStep.completion_rule && <Tag color="warning">완료 조건 확인</Tag>}
+      </div>
+      <InfoGrid
+        items={[
+          ['Step 번호', selectedStep.step_order],
+          ['단계 명', selectedStep.title],
+          ['block_type', selectedStep.block_type],
+          ['device_target', selectedStep.device_target],
+          ['learning_role', selectedStep.learning_role],
+          ['활용 가능 데이터셋', datasetHints.join('\n')],
+          ['정답/예상답안', hasAnswer ? '보유' : '없음'],
+          ['완료 조건', selectedStep.completion_rule ? '보유' : '없음'],
+          ['모바일/PC 표시 여부', visibilityText],
+        ]}
+      />
+      <div className="pbl-preview-step-picker">
+        {previewSteps.map(({ step, variant: stepVariant }, index) => (
+          <button
+            type="button"
+            className={step.step_id === selectedStepId ? 'is-active' : ''}
+            key={step.step_id}
+            onClick={() => onSelectStep(step.step_id)}
+          >
+            <span>{index + 1}</span>
+            <strong>{step.title}</strong>
+            <small>{stepVariant === 'summary' ? '요약' : step.block_type}</small>
+          </button>
+        ))}
+      </div>
+      <InternalInfoDetails step={selectedStep} />
+    </aside>
+  )
+}
+
+function PcWorkAreaPanel({ mission }: { mission: PreviewMission }) {
+  const submission = asRecord(mission.submission)
+
+  return (
+    <article className="pbl-preview-pc-work-area">
+      <div>
+        <Tag>PC 수행 영역</Tag>
+        <h4>제출물 작성 및 최종 검토</h4>
+        <p>이 미션은 모바일 중심으로 진행되며, PC에서는 제출물 작성 및 최종 검토를 진행합니다.</p>
+      </div>
+      <InfoGrid
+        items={[
+          ['제출물', submission.submission_title || mission.student_outputs],
+          ['제출 안내', submission.student_instruction],
+          ['평가 기준', submission.evaluation_text],
+          ['PASS 기준', submission.pass_criteria],
+        ]}
+      />
+    </article>
   )
 }
 
@@ -350,22 +496,31 @@ function StepPreviewCard({
   step,
   variant,
   mode,
+  selected = false,
   response,
+  onSelectStep,
   onResponseChange,
 }: {
   mission: PreviewMission
   step: PreviewStep
   variant: PreviewDisplayVariant
   mode: PreviewDeviceMode
+  selected?: boolean
   response?: StepResponseValue
+  onSelectStep?: (stepId: string) => void
   onResponseChange: (stepId: string, value: StepResponseValue) => void
 }) {
   if (variant === 'summary') {
-    return <StepSummaryCard step={step} mode={mode} />
+    return <StepSummaryCard step={step} mode={mode} selected={selected} onSelectStep={onSelectStep} />
   }
 
   return (
-    <article className={`pbl-preview-step-card block-${step.block_type}`}>
+    <article
+      className={`pbl-preview-step-card block-${step.block_type}${selected ? ' is-selected' : ''}`}
+      tabIndex={0}
+      onClickCapture={() => onSelectStep?.(step.step_id)}
+      onFocusCapture={() => onSelectStep?.(step.step_id)}
+    >
       <div className="pbl-preview-card-heading">
         <div>
           <span>Step {step.step_order}</span>
@@ -388,11 +543,26 @@ function StepPreviewCard({
   )
 }
 
-function StepSummaryCard({ step, mode }: { step: PreviewStep; mode: PreviewDeviceMode }) {
+function StepSummaryCard({
+  step,
+  mode,
+  selected = false,
+  onSelectStep,
+}: {
+  step: PreviewStep
+  mode: PreviewDeviceMode
+  selected?: boolean
+  onSelectStep?: (stepId: string) => void
+}) {
   const isMobile = mode === 'mobile'
 
   return (
-    <article className="pbl-preview-step-card is-summary">
+    <article
+      className={`pbl-preview-step-card is-summary${selected ? ' is-selected' : ''}`}
+      tabIndex={0}
+      onClickCapture={() => onSelectStep?.(step.step_id)}
+      onFocusCapture={() => onSelectStep?.(step.step_id)}
+    >
       <div className="pbl-preview-summary-icon">
         {isMobile ? <DesktopOutlined /> : <MobileOutlined />}
       </div>
@@ -797,6 +967,35 @@ function InfoGrid({ items }: { items: [string, unknown][] }) {
       ))}
     </dl>
   )
+}
+
+function hasStepAnswer(step: PreviewStep) {
+  return Boolean(
+    step.correct_answer
+      || step.expected_answer_text
+      || step.explanation
+      || step.correct_order?.length
+      || step.options.some((option) => option.is_correct || option.is_expected),
+  )
+}
+
+function getPreviewStepDatasetHints(step: PreviewStep) {
+  const source = [
+    step.learner_text,
+    step.body,
+    step.question,
+    step.mobile_summary,
+    step.pc_detail,
+    step.expected_output,
+  ]
+    .filter(Boolean)
+    .join('\n')
+
+  return source
+    .split(/\n|,|;/)
+    .map((item) => item.trim())
+    .filter((item) => /데이터셋|공개 데이터|가상 데이터|샘플 데이터|Kaggle|UCI|CCTV|센서/.test(item))
+    .slice(0, 4)
 }
 
 function getCodeBlockText(step: PreviewStep) {

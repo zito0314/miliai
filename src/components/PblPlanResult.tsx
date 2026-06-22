@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { CopyOutlined, DownloadOutlined, FileTextOutlined } from '@ant-design/icons'
+import { CopyOutlined, DownloadOutlined, FileExcelOutlined, FileTextOutlined } from '@ant-design/icons'
 import { Alert, Button, Dropdown, Tabs, Tag, message } from 'antd'
 import type { ExcelWorkbookSheet, Mission, PblDifficulty, PblPlan, Step, ValidationChecklistItem } from '../types/pbl'
 import type { RefineTargetType } from '../types/refine'
@@ -7,6 +7,7 @@ import type { TechItem } from '../types/tech'
 import { formatPblDifficultyLabel, normalizePblDifficulty } from '../constants/pblDifficulty'
 import { generateAnswerGuide } from '../services/generateAnswerGuide'
 import { copyWorkbookAsTsv, copyWorkbookSheetAsTsv } from '../utils/copyPblPlanAsTsv'
+import { downloadExcelWorkbook } from '../utils/downloadExcelWorkbook'
 import { downloadJson } from '../utils/downloadJson'
 import { getByPath } from '../utils/getByPath'
 import { AnswerGuidePanel } from './AnswerGuidePanel'
@@ -105,9 +106,32 @@ export function PblPlanResult({ plan, subjectName, techItems, historyCount, onPl
     }
   }
 
+  const handleDownloadExcel = () => {
+    try {
+      const fileName = downloadExcelWorkbook(plan)
+      messageApi.success(`${fileName} 파일을 다운로드했어요.`)
+    } catch {
+      messageApi.error('Excel 파일을 생성하지 못했어요. 잠시 후 다시 시도해주세요.')
+    }
+  }
+
   return (
     <section className="pbl-result" aria-label="생성된 PBL 콘텐츠">
       {contextHolder}
+      <div className="pbl-result-toolbar">
+        <div className="pbl-result-heading">
+          <span>생성된 PBL 콘텐츠</span>
+          <h2>{plan.project.title}</h2>
+        </div>
+        <ExportActionsDropdown
+          activeSheet={activeSheet}
+          onCopySheet={handleCopySheet}
+          onCopyWorkbook={handleCopyWorkbook}
+          onDownloadExcel={handleDownloadExcel}
+          onDownloadJson={() => downloadJson(plan)}
+        />
+      </div>
+
       <PblFeedbackPanel
         plan={plan}
         subjectName={subjectName}
@@ -121,19 +145,6 @@ export function PblPlanResult({ plan, subjectName, techItems, historyCount, onPl
       />
 
       <RefineResultNotice message={lastChangeSummary} />
-
-      <div className="pbl-result-toolbar">
-        <div className="pbl-result-heading">
-          <span>생성된 PBL 콘텐츠</span>
-          <h2>{plan.project.title}</h2>
-        </div>
-        <ExportActionsDropdown
-          activeSheet={activeSheet}
-          onCopySheet={handleCopySheet}
-          onCopyWorkbook={handleCopyWorkbook}
-          onDownloadJson={() => downloadJson(plan)}
-        />
-      </div>
 
       <Tabs
         className="result-view-tabs"
@@ -176,6 +187,7 @@ export function PblPlanResult({ plan, subjectName, techItems, historyCount, onPl
                 onGenerateAnswerGuide={handleGenerateAnswerGuide}
                 onCopySheet={handleCopySheet}
                 onCopyWorkbook={handleCopyWorkbook}
+                onDownloadExcel={handleDownloadExcel}
                 onDownloadJson={() => downloadJson(plan)}
               />
             ),
@@ -202,11 +214,13 @@ function ExportActionsDropdown({
   activeSheet,
   onCopySheet,
   onCopyWorkbook,
+  onDownloadExcel,
   onDownloadJson,
 }: {
   activeSheet?: ExcelWorkbookSheet
   onCopySheet: (sheet: ExcelWorkbookSheet | undefined) => Promise<void>
   onCopyWorkbook: () => Promise<void>
+  onDownloadExcel: () => void
   onDownloadJson: () => void
 }) {
   return (
@@ -214,6 +228,12 @@ function ExportActionsDropdown({
       trigger={['click']}
       menu={{
         items: [
+          {
+            key: 'excel',
+            icon: <FileExcelOutlined />,
+            label: 'Excel 다운로드(.xlsx)',
+            onClick: onDownloadExcel,
+          },
           {
             key: 'json',
             icon: <DownloadOutlined />,
@@ -249,15 +269,9 @@ function UserSummaryTab({ plan, subjectName }: { plan: PblPlan; subjectName: str
       <div className="pbl-summary workbook-summary">
         <div className="pbl-summary-main">
           <span>프로젝트 개요</span>
+          <h2>{plan.project.title}</h2>
+          <p>{plan.project.short_description}</p>
           <dl>
-            <div>
-              <dt>PBL 제목</dt>
-              <dd>{plan.project.title}</dd>
-            </div>
-            <div>
-              <dt>PBL 설명</dt>
-              <dd>{plan.project.short_description}</dd>
-            </div>
             <div>
               <dt>과목명</dt>
               <dd>{subjectName}</dd>
@@ -351,10 +365,16 @@ function MissionDetailTab({ plan }: { plan: PblPlan }) {
             <div className="mission-step-card-list">
               {mission.steps.map((step) => {
                 const datasetHints = getStepDatasetHints(step)
+                const statusBadges = getStepStatusBadges(step, plan.validation_checklist)
                 return (
                   <article className="mission-step-summary-card" key={step.step_id}>
                     <span>Step {step.step_order}</span>
                     <strong>{step.title}</strong>
+                    <div className="mission-step-status-tags">
+                      {statusBadges.map((badge) => (
+                        <Tag color={badge.color} key={badge.label}>{badge.label}</Tag>
+                      ))}
+                    </div>
                     <div className="mission-step-card-tags">
                       <Tag>{step.block_type}</Tag>
                       <Tag>{step.device_target || step.required_device}</Tag>
@@ -499,6 +519,7 @@ function ExcelJsonDataTab({
   onGenerateAnswerGuide,
   onCopySheet,
   onCopyWorkbook,
+  onDownloadExcel,
   onDownloadJson,
 }: {
   plan: PblPlan
@@ -510,6 +531,7 @@ function ExcelJsonDataTab({
   onGenerateAnswerGuide: (targetMissionIndex?: number) => Promise<void>
   onCopySheet: (sheet: ExcelWorkbookSheet | undefined) => Promise<void>
   onCopyWorkbook: () => Promise<void>
+  onDownloadExcel: () => void
   onDownloadJson: () => void
 }) {
   const activeSheet = plan.excelWorkbook.sheets.find((sheet) => sheet.sheetName === activeSheetName) || plan.excelWorkbook.sheets[0]
@@ -520,13 +542,15 @@ function ExcelJsonDataTab({
         <div>
           <span>내보내기</span>
           <h3>플랫폼 입력용 데이터 내보내기</h3>
-          <p>검토가 끝난 PBL 콘텐츠를 JSON 또는 TSV 형태로 복사합니다.</p>
+          <p>검토가 끝난 PBL 콘텐츠를 Excel, JSON, TSV 형태로 내보냅니다.</p>
         </div>
-        <div className="export-action-buttons">
-          <Button icon={<DownloadOutlined />} onClick={onDownloadJson}>JSON 다운로드</Button>
-          <Button icon={<CopyOutlined />} onClick={() => void onCopyWorkbook()}>전체 시트 TSV 복사</Button>
-          <Button icon={<CopyOutlined />} onClick={() => void onCopySheet(activeSheet)}>선택 시트 TSV 복사</Button>
-        </div>
+        <ExportActionsDropdown
+          activeSheet={activeSheet}
+          onCopySheet={onCopySheet}
+          onCopyWorkbook={onCopyWorkbook}
+          onDownloadExcel={onDownloadExcel}
+          onDownloadJson={onDownloadJson}
+        />
       </section>
 
       <details className="advanced-data-view">
@@ -715,6 +739,62 @@ function getStepDeviceVisibility(step: Step) {
     mobile: step.mobile_visible !== false && target !== 'pc',
     pc: step.pc_visible !== false && target !== 'mobile',
   }
+}
+
+function getStepStatusBadges(step: Step, validationChecklist: ValidationChecklistItem[]) {
+  const visibility = getStepDeviceVisibility(step)
+  const badges: { label: string; color?: string }[] = []
+  const mobileLearningRoles = new Set(['understand', 'decide', 'practice', 'review'])
+  const hasDataset = getStepDatasetHints(step).length > 0
+  const hasAnswer = Boolean(
+    step.correct_answer
+      || step.expected_answer_text
+      || step.options.some((option) => option.is_correct || option.is_expected)
+      || step.correct_order?.length
+      || step.explanation,
+  )
+  const requiresReview = Boolean(
+    step.planner_note
+      || step.developer_note
+      || !step.completion_rule
+      || !step.block_type
+      || !(step.device_target || step.required_device || step.device)
+      || !(step.question || step.learner_text || step.body)
+      || hasStepValidationWarning(step, validationChecklist),
+  )
+
+  if (visibility.mobile || step.device_target === 'mobile' || step.mobile_visible === true || mobileLearningRoles.has(step.learning_role || '')) {
+    badges.push({ label: '모바일 가능', color: 'cyan' })
+  }
+  if (step.required_device === 'pc' || step.device_target === 'pc' || step.pc_visible === true || step.block_type === 'pc_verification' || step.block_type === 'submission' || step.submission_type?.length) {
+    badges.push({ label: 'PC 필요', color: 'orange' })
+  }
+  if (hasAnswer) badges.push({ label: '정답 있음', color: 'green' })
+  if (requiresReview) badges.push({ label: '검토 필요', color: 'gold' })
+  if (hasDataset) badges.push({ label: '데이터셋 있음' })
+
+  return badges
+}
+
+function hasStepValidationWarning(step: Step, validationChecklist: ValidationChecklistItem[]) {
+  const stepKeywords = [
+    step.step_id,
+    step.title,
+    `Step ${step.step_order}`,
+    `step ${step.step_order}`,
+    `스텝 ${step.step_order}`,
+  ].filter(Boolean)
+
+  return validationChecklist.some((item) => {
+    if (item.status === '통과') return false
+    const checkText = [
+      item.category,
+      item.check_item,
+      item.planner_criteria,
+      item.developer_criteria,
+    ].join(' ')
+    return stepKeywords.some((keyword) => checkText.includes(String(keyword)))
+  })
 }
 
 function getProjectDifficulty(plan: PblPlan): PblDifficulty {
