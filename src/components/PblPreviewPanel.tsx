@@ -9,6 +9,7 @@ import {
 } from '@ant-design/icons'
 import { Alert, Button, Checkbox, Empty, Progress, Radio, Select, Segmented, Tag } from 'antd'
 import type { PblPlan } from '../types/pbl'
+import { MobileLearningPreview } from './MobileLearningPreview'
 import {
   getPreviewDisplayVariant,
   type PreviewDeviceMode,
@@ -165,14 +166,20 @@ export function PblPreviewPanel({ plan }: PblPreviewPanelProps) {
             onResponseChange={handleResponseChange}
           />
         ) : (
-          <MobilePreviewLayout
-            mission={activeMission}
-            previewSteps={previewSteps}
-            selectedStep={selectedStep}
-            selectedStepId={effectiveSelectedStepId}
-            responses={responses}
-            onSelectStep={setSelectedStepId}
-            onResponseChange={handleResponseChange}
+          <MobileLearningPreview
+            content={previewContent}
+            selectedProjectId={activeProject.project_id}
+            selectedMissionId={activeMission.mission_id}
+            onProjectChange={(projectId) => {
+              setActiveProjectId(projectId)
+              const nextProject = previewContent.projects.find((project) => project.project_id === projectId)
+              setActiveMissionId(nextProject?.missions[0]?.mission_id || '')
+              setSelectedStepId('')
+            }}
+            onMissionChange={(missionId) => {
+              setActiveMissionId(missionId)
+              setSelectedStepId('')
+            }}
           />
         )}
       </div>
@@ -221,55 +228,6 @@ function ValidationSummary({
         </details>
       )}
     />
-  )
-}
-
-function MobilePreviewLayout({
-  mission,
-  previewSteps,
-  selectedStep,
-  selectedStepId,
-  responses,
-  onSelectStep,
-  onResponseChange,
-}: {
-  mission: PreviewMission
-  previewSteps: { step: PreviewStep; variant: PreviewDisplayVariant }[]
-  selectedStep?: PreviewStep
-  selectedStepId: string
-  responses: Record<string, StepResponseValue>
-  onSelectStep: (stepId: string) => void
-  onResponseChange: (stepId: string, value: StepResponseValue) => void
-}) {
-  return (
-    <div className="pbl-preview-mobile-workspace">
-      <div className="pbl-preview-mobile-shell">
-        <MissionPreviewHeader mission={mission} />
-        <div className="pbl-preview-step-stack">
-          {previewSteps.map(({ step, variant }) => (
-            <StepPreviewCard
-              key={step.step_id}
-              mission={mission}
-              step={step}
-              variant={variant}
-              mode="mobile"
-              selected={step.step_id === selectedStepId}
-              response={responses[step.step_id]}
-              onSelectStep={onSelectStep}
-              onResponseChange={onResponseChange}
-            />
-          ))}
-          <SubmissionPreviewCard mission={mission} mode="mobile" />
-        </div>
-      </div>
-      <StepReviewPanel
-        mode="mobile"
-        previewSteps={previewSteps}
-        selectedStep={selectedStep}
-        selectedStepId={selectedStepId}
-        onSelectStep={onSelectStep}
-      />
-    </div>
   )
 }
 

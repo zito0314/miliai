@@ -1442,6 +1442,691 @@
   overflow: auto;
 }
 
+.mobile-learning-preview {
+  display: grid;
+  grid-template-columns: minmax(320px, 390px) minmax(300px, 1fr);
+  align-items: start;
+  justify-content: center;
+  gap: 18px;
+}
+
+.mobile-preview-phone-frame {
+  width: min(390px, 100%);
+  min-height: 720px;
+  max-height: 760px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  border: 1px solid #d7e0dd;
+  border-radius: 28px;
+  background: #ffffff;
+  box-shadow: 0 22px 56px rgba(28, 43, 50, 0.16);
+  overflow: hidden;
+}
+
+.mobile-preview-appbar {
+  min-height: 62px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid #edf1f3;
+  padding: 12px 14px;
+  background: #ffffff;
+}
+
+.mobile-preview-appbar-left {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mobile-preview-appbar button {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #f2f5f8;
+  color: #1f2d3d;
+  cursor: pointer;
+}
+
+.mobile-preview-app-icon {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: #edf4ff;
+  color: #1877f2;
+}
+
+.mobile-preview-appbar span {
+  display: block;
+  color: #6b7785;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.mobile-preview-appbar strong {
+  overflow: hidden;
+  display: block;
+  color: #1e2937;
+  font-size: 14px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobile-preview-screen-body {
+  min-height: 0;
+  overflow: auto;
+  background: #f5f7fb;
+  padding: 16px;
+}
+
+.mobile-preview-bottom-bar {
+  border-top: 1px solid #edf1f3;
+  padding: 12px 14px 14px;
+  background: #ffffff;
+}
+
+.mobile-learning-screen {
+  display: grid;
+  gap: 14px;
+}
+
+.mobile-learning-hero,
+.mobile-learning-detail-hero,
+.mobile-learning-section-heading,
+.mobile-learning-player-head,
+.mobile-learning-question-card,
+.mobile-learning-info-section,
+.mobile-learning-activity-card,
+.mobile-learning-input-card,
+.mobile-learning-code-task,
+.mobile-learning-hint-card,
+.mobile-learning-vod-card,
+.mobile-learning-empty {
+  min-width: 0;
+  border: 1px solid #e6ebef;
+  border-radius: 18px;
+  background: #ffffff;
+}
+
+.mobile-learning-hero,
+.mobile-learning-detail-hero,
+.mobile-learning-section-heading {
+  padding: 16px;
+}
+
+.mobile-learning-hero {
+  background: linear-gradient(135deg, #ffffff 0%, #eef5ff 100%);
+}
+
+.mobile-learning-hero span,
+.mobile-learning-detail-hero > span,
+.mobile-learning-section-heading span,
+.mobile-learning-info-section span,
+.mobile-learning-step-list-heading span,
+.mobile-learning-player-head span,
+.mobile-learning-code-preview span,
+.mobile-learning-review-panel > div:first-child span {
+  color: #176b5b;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.mobile-learning-hero h3,
+.mobile-learning-detail-hero h3,
+.mobile-learning-section-heading h3,
+.mobile-learning-question-card h3 {
+  margin: 5px 0 7px;
+  color: #182434;
+  font-size: 19px;
+  line-height: 1.35;
+}
+
+.mobile-learning-hero p,
+.mobile-learning-detail-hero p,
+.mobile-learning-section-heading p,
+.mobile-learning-question-card p,
+.mobile-learning-info-section p,
+.mobile-learning-activity-card p,
+.mobile-learning-input-card p,
+.mobile-learning-hint-card p,
+.mobile-learning-vod-card p,
+.mobile-learning-empty p,
+.mobile-learning-review-panel p {
+  margin: 0;
+  color: #5d6a78;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.mobile-learning-card-list,
+.mobile-learning-list,
+.mobile-learning-step-list {
+  display: grid;
+  gap: 10px;
+}
+
+.mobile-learning-project-card,
+.mobile-learning-list-item,
+.mobile-learning-step-row {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #e3e9ed;
+  border-radius: 18px;
+  display: grid;
+  align-items: center;
+  gap: 12px;
+  background: #ffffff;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.mobile-learning-project-card {
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 12px;
+}
+
+.mobile-learning-project-card > div:not(.mobile-learning-thumbnail) {
+  min-width: 0;
+}
+
+.mobile-learning-project-card > .mobile-learning-thumbnail {
+  grid-column: 1 / -1;
+}
+
+.mobile-learning-project-card > .anticon,
+.mobile-learning-list-item > .anticon,
+.mobile-learning-step-row > .anticon {
+  color: #8b98a8;
+}
+
+.mobile-learning-thumbnail {
+  min-height: 132px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, #14b8a6 0%, #1877f2 48%, #b23cff 100%);
+  color: #ffffff;
+  font-size: 30px;
+}
+
+.mobile-learning-thumbnail.theme-1 {
+  background: linear-gradient(135deg, #84cc16 0%, #22c55e 42%, #1877f2 100%);
+}
+
+.mobile-learning-thumbnail.theme-2 {
+  background: linear-gradient(135deg, #f59e0b 0%, #ef6c57 44%, #6d5dfc 100%);
+}
+
+.mobile-learning-thumbnail.is-large {
+  min-height: 148px;
+  margin-bottom: 14px;
+}
+
+.mobile-learning-project-card span,
+.mobile-learning-list-item small,
+.mobile-learning-step-row small,
+.mobile-learning-progress-line small {
+  color: #6d7784;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.mobile-learning-project-card strong,
+.mobile-learning-list-item strong,
+.mobile-learning-step-row strong,
+.mobile-learning-step-list-heading strong,
+.mobile-learning-activity-card strong,
+.mobile-learning-input-card > strong,
+.mobile-learning-hint-card strong,
+.mobile-learning-vod-card strong,
+.mobile-learning-empty strong,
+.mobile-learning-review-panel strong {
+  color: #172333;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.mobile-learning-project-card strong {
+  display: block;
+  margin-top: 5px;
+  font-size: 15px;
+}
+
+.mobile-learning-project-card p {
+  overflow: hidden;
+  display: -webkit-box;
+  margin: 6px 0 0;
+  color: #53606e;
+  font-size: 12px;
+  line-height: 1.55;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.mobile-learning-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.mobile-learning-chip-row .ant-tag {
+  margin: 0;
+  border: 0;
+  border-radius: 999px;
+  background: #eef4f7;
+  color: #526272;
+  font-size: 10px;
+}
+
+.mobile-learning-progress-line {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.mobile-learning-detail-hero {
+  background: #ffffff;
+}
+
+.mobile-learning-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  border-radius: 14px;
+  padding: 4px;
+  background: #e9eef4;
+}
+
+.mobile-learning-tabs button {
+  border: 0;
+  border-radius: 11px;
+  padding: 9px 8px;
+  background: transparent;
+  color: #6a7480;
+  font-size: 12px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.mobile-learning-tabs button.is-active {
+  background: #ffffff;
+  color: #1877f2;
+  box-shadow: 0 4px 10px rgba(45, 75, 110, 0.08);
+}
+
+.mobile-learning-info-section {
+  padding: 14px;
+}
+
+.mobile-learning-info-section p,
+.mobile-learning-fact-list dd,
+.mobile-learning-review-grid dd {
+  white-space: pre-line;
+}
+
+.mobile-learning-fact-list,
+.mobile-learning-review-grid {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.mobile-learning-fact-list > div,
+.mobile-learning-review-grid > div {
+  border: 1px solid #e6ebef;
+  border-radius: 14px;
+  padding: 11px 12px;
+  background: #ffffff;
+}
+
+.mobile-learning-fact-list dt,
+.mobile-learning-review-grid dt {
+  color: #6d7784;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.mobile-learning-fact-list dd,
+.mobile-learning-review-grid dd {
+  margin: 5px 0 0;
+  color: #233043;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.mobile-learning-list-item {
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  padding: 12px;
+}
+
+.mobile-learning-list-item > span,
+.mobile-learning-step-row > span {
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: #eef4ff;
+  color: #1877f2;
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.mobile-learning-list-item.is-active {
+  border-color: #9ec5ff;
+  background: #f7fbff;
+}
+
+.mobile-learning-list-item p {
+  overflow: hidden;
+  display: -webkit-box;
+  margin: 4px 0 5px;
+  color: #5d6877;
+  font-size: 12px;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.mobile-learning-vod-card,
+.mobile-learning-activity-card,
+.mobile-learning-hint-card {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 10px;
+  padding: 14px;
+}
+
+.mobile-learning-vod-card > .anticon,
+.mobile-learning-activity-icon,
+.mobile-learning-hint-card > .anticon {
+  width: 38px;
+  height: 38px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background: #edf4ff;
+  color: #1877f2;
+  font-size: 17px;
+}
+
+.mobile-learning-step-list {
+  border: 1px solid #e6ebef;
+  border-radius: 18px;
+  padding: 12px;
+  background: #ffffff;
+}
+
+.mobile-learning-step-list-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.mobile-learning-step-row {
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  border-radius: 15px;
+  padding: 11px;
+  background: #f8fafc;
+}
+
+.mobile-learning-player-head,
+.mobile-learning-question-card,
+.mobile-learning-input-card,
+.mobile-learning-code-task {
+  padding: 14px;
+}
+
+.mobile-learning-player-head {
+  display: grid;
+  gap: 10px;
+}
+
+.mobile-learning-player-head strong {
+  display: block;
+  margin-top: 3px;
+  color: #1c2736;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.mobile-learning-question-card .ant-tag {
+  margin: 0 0 8px;
+  border: 0;
+  border-radius: 999px;
+  background: #fff4df;
+  color: #b56a00;
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.mobile-learning-input-card,
+.mobile-learning-code-task {
+  display: grid;
+  gap: 12px;
+}
+
+.mobile-learning-input-card .ant-radio-group,
+.mobile-learning-input-card .ant-checkbox-group {
+  display: grid;
+  gap: 8px;
+}
+
+.mobile-learning-input-card .ant-radio-wrapper,
+.mobile-learning-input-card .ant-checkbox-wrapper {
+  min-height: 44px;
+  align-items: flex-start;
+  border: 1px solid #e7edf2;
+  border-radius: 14px;
+  margin: 0;
+  padding: 11px 12px;
+  background: #f8fafc;
+  color: #2d3a49;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.mobile-learning-code-preview {
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+}
+
+.mobile-learning-code-preview pre {
+  max-height: 190px;
+  overflow: auto;
+  margin: 0;
+  border-radius: 14px;
+  padding: 13px;
+  background: #253142;
+  color: #edf5ff;
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.mobile-learning-order-list,
+.mobile-learning-question-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mobile-learning-order-list li {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 9px;
+  align-items: start;
+  border: 1px solid #e7edf2;
+  border-radius: 14px;
+  padding: 10px;
+  background: #f8fafc;
+}
+
+.mobile-learning-order-list span {
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: #eaf3ff;
+  color: #1877f2;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.mobile-learning-order-list p,
+.mobile-learning-question-list li {
+  margin: 0;
+  color: #334154;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.mobile-learning-question-list li {
+  border: 1px solid #e7edf2;
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: #f8fafc;
+}
+
+.mobile-learning-step-footer,
+.mobile-learning-footer-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.mobile-learning-step-footer {
+  grid-template-columns: 72px 84px minmax(0, 1fr);
+}
+
+.mobile-preview-bottom-bar .ant-btn {
+  height: 40px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.mobile-preview-bottom-bar .ant-btn-primary,
+.mobile-learning-input-card .ant-btn-primary {
+  background: #1877f2;
+}
+
+.mobile-learning-review-panel {
+  min-width: 0;
+  display: grid;
+  gap: 14px;
+  border: 1px solid #d7e0dd;
+  border-radius: 8px;
+  padding: 16px;
+  background: #ffffff;
+}
+
+.mobile-learning-review-panel > div:first-child {
+  display: grid;
+  gap: 6px;
+}
+
+.mobile-learning-review-panel > div:first-child strong {
+  font-size: 16px;
+}
+
+.mobile-learning-review-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.mobile-learning-review-tags .ant-tag,
+.mobile-learning-review-options .ant-tag {
+  margin: 0;
+  border-radius: 999px;
+}
+
+.mobile-learning-review-details {
+  border-top: 1px solid #e5ebe8;
+  padding-top: 12px;
+}
+
+.mobile-learning-review-details summary {
+  cursor: pointer;
+  color: #36584f;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.mobile-learning-review-options {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.mobile-learning-review-options > div {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  border: 1px solid #e5ebe8;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #fbfcfc;
+}
+
+.mobile-learning-review-options span {
+  color: #2f3f3a;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.mobile-learning-review-options small {
+  grid-column: 2;
+  color: #687772;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.mobile-learning-empty {
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  padding: 24px 16px;
+  text-align: center;
+}
+
+.mobile-learning-empty > .anticon {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background: #edf4ff;
+  color: #1877f2;
+}
+
+.mobile-learning-muted {
+  margin: 0;
+  color: #6f7f79;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
 .pbl-preview-empty-state {
   border: 1px dashed #cbd9d4;
   border-radius: 8px;
@@ -3186,6 +3871,10 @@ mark {
     grid-template-columns: 1fr;
   }
 
+  .mobile-learning-preview {
+    grid-template-columns: 1fr;
+  }
+
   .pbl-preview-step-nav {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -3312,6 +4001,17 @@ mark {
     max-height: none;
     min-height: auto;
     box-shadow: none;
+  }
+
+  .mobile-preview-phone-frame {
+    width: 100%;
+    min-height: 680px;
+    max-height: none;
+    border-radius: 20px;
+  }
+
+  .mobile-preview-screen-body {
+    padding: 12px;
   }
 
   .pbl-preview-step-nav {
