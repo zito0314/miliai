@@ -60,7 +60,10 @@ function buildProjectRows(plan: PblPlan) {
     'environment_type',
     'duration_label',
     'target_learner',
+    'difficulty_level',
     'difficulty_label',
+    'difficulty_description',
+    'difficulty_evaluation_scope',
     'project_goal',
     'learning_mode',
     'prerequisites',
@@ -73,10 +76,17 @@ function buildProjectRows(plan: PblPlan) {
     'planner_note',
     'developer_note',
   ]
+  const projectRowValues: Record<string, unknown> = {
+    ...plan.project,
+    difficulty_level: plan.project.difficulty?.level ?? plan.project.difficulty_level,
+    difficulty_label: plan.project.difficulty_label,
+    difficulty_description: plan.project.difficulty?.description,
+    difficulty_evaluation_scope: plan.project.difficulty?.evaluationScope,
+  }
 
   return [
     header,
-    header.map((key) => toCell(plan.project[key as keyof typeof plan.project])),
+    header.map((key) => toCell(projectRowValues[key])),
   ]
 }
 
@@ -97,13 +107,21 @@ function buildMissionRows(missions: Mission[]) {
     'prerequisites',
     'tech_stack',
     'constraints',
+    'ai_usage_allowed',
+    'ai_usage_prohibited',
+    'ai_usage_principles',
     'is_pc_required',
     'has_mobile_alternative',
   ]
 
   return [
     header,
-    ...missions.map((mission) => header.map((key) => toCell(mission[key as keyof Mission]))),
+    ...missions.map((mission) => header.map((key) => {
+      if (key === 'ai_usage_allowed') return toCell(mission.ai_usage_guide?.allowed)
+      if (key === 'ai_usage_prohibited') return toCell(mission.ai_usage_guide?.prohibited)
+      if (key === 'ai_usage_principles') return toCell(mission.ai_usage_guide?.principles)
+      return toCell(mission[key as keyof Mission])
+    })),
   ]
 }
 
