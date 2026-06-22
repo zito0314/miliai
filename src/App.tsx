@@ -28,6 +28,8 @@ function App() {
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [selectedItem, setSelectedItem] = useState<TechItem | null>(null)
   const [favoriteOnly, setFavoriteOnly] = useState(false)
+  const [pblResultVisible, setPblResultVisible] = useState(false)
+  const [techSearchManuallyExpanded, setTechSearchManuallyExpanded] = useState(false)
   const requestIdRef = useRef(0)
   const [favorites, setFavorites] = useState<string[]>(() => {
     try {
@@ -103,6 +105,12 @@ function App() {
 
   const unitBundles = useMemo(() => buildUnitBundles(filteredItems), [filteredItems])
   const hasFilters = query.trim() !== '' || activeCategory !== '전체' || selectedTags.length > 0 || favoriteOnly
+  const techSearchExpanded = !pblResultVisible || techSearchManuallyExpanded
+
+  const handlePblResultVisibleChange = useCallback((visible: boolean) => {
+    setPblResultVisible(visible)
+    if (visible) setTechSearchManuallyExpanded(false)
+  }, [])
 
   const toggleTag = (tag: string) => {
     setSelectedTags((current) => (current.includes(tag) ? current.filter((item) => item !== tag) : [...current, tag]))
@@ -127,113 +135,135 @@ function App() {
   return (
     <div className="app-shell">
       <Header />
-      <PblGenerator techItems={techItems} isTechItemsLoading={loading} onLoadTechItems={loadTechItems} />
-      <SearchBar value={query} resultCount={filteredItems.length} onChange={setQuery} />
-      <DataStatusBar
-        loading={loading}
-        error={error}
-        lastUpdated={lastUpdated}
-        itemCount={techItems.length}
-        onRefresh={() => void loadTechItems()}
+      <PblGenerator
+        techItems={techItems}
+        isTechItemsLoading={loading}
+        onLoadTechItems={loadTechItems}
+        onResultVisibleChange={handlePblResultVisibleChange}
       />
 
-      <main className="workspace">
-        <aside className="filter-sidebar" aria-label="검색 필터">
-          <div className="filter-sidebar-heading">
-            <span>
-              <FilterOutlined /> 필터
-            </span>
-            {hasFilters && (
-              <Button type="link" size="small" onClick={resetFilters}>
-                초기화
-              </Button>
-            )}
+      {pblResultVisible && (
+        <section className="tech-search-toggle">
+          <div>
+            <span>참고 기술 검색</span>
+            <p>생성 결과 검토 중에는 기술 목록을 접어두고 필요할 때만 펼칩니다.</p>
           </div>
-          <CategoryFilter categories={categories} selected={activeCategory} counts={categoryCounts} onChange={setCategory} />
-          <TagFilter tags={popularTags} selectedTags={selectedTags} onToggle={toggleTag} />
-          <Button
-            className={`favorite-filter ${favoriteOnly ? 'is-active' : ''}`}
-            icon={<StarFilled />}
-            onClick={() => setFavoriteOnly((current) => !current)}
-          >
-            즐겨찾기만 보기 <span>{favorites.length}</span>
+          <Button onClick={() => setTechSearchManuallyExpanded((current) => !current)}>
+            {techSearchExpanded ? '참고 기술 검색 접기' : '참고 기술 검색 펼치기'}
           </Button>
-        </aside>
+        </section>
+      )}
 
-        <div className="results-column">
-          {hasFilters && (
-            <div className="active-filters" aria-label="선택된 필터">
-              <span>적용 중</span>
-              {activeCategory !== '전체' && (
-                <Tag closable onClose={() => setCategory('전체')}>
-                  {activeCategory}
-                </Tag>
-              )}
-              {selectedTags.map((tag) => (
-                <Tag key={tag} closable onClose={() => toggleTag(tag)}>
-                  {tag}
-                </Tag>
-              ))}
-              {favoriteOnly && (
-                <Tag closable onClose={() => setFavoriteOnly(false)}>
-                  즐겨찾기
-                </Tag>
-              )}
-              <Button type="text" size="small" icon={<CloseOutlined />} onClick={resetFilters}>
-                전체 해제
-              </Button>
-            </div>
-          )}
+      {techSearchExpanded && (
+        <>
+          <SearchBar value={query} resultCount={filteredItems.length} onChange={setQuery} />
+          <DataStatusBar
+            loading={loading}
+            error={error}
+            lastUpdated={lastUpdated}
+            itemCount={techItems.length}
+            onRefresh={() => void loadTechItems()}
+          />
 
-          {(query.trim() || selectedTags.length > 0) && <UnitBundles bundles={unitBundles} />}
-
-          <section className="results-section" aria-live="polite">
-            <div className="results-heading">
-              <div>
-                <span>기술·Unit 탐색</span>
-                <h1>{query.trim() ? `“${query}” 검색 결과` : '전체 기술 목록'}</h1>
-              </div>
-              <p>
-                총 <strong>{filteredItems.length}</strong>개 항목
-              </p>
-            </div>
-
-            {loading && techItems.length === 0 ? (
-              <div className="data-loading-state">
-                <Spin size="large" />
-                <p>기술 데이터를 불러오는 중이에요.</p>
-              </div>
-            ) : error && techItems.length === 0 ? (
-              <Result
-                status="error"
-                title="데이터를 불러오지 못했어요."
-                subTitle="Google Sheets CSV 링크 또는 게시 상태를 확인해주세요."
-                extra={
-                  <Button type="primary" onClick={() => void loadTechItems()}>
-                    다시 시도
+          <main className="workspace">
+            <aside className="filter-sidebar" aria-label="검색 필터">
+              <div className="filter-sidebar-heading">
+                <span>
+                  <FilterOutlined /> 필터
+                </span>
+                {hasFilters && (
+                  <Button type="link" size="small" onClick={resetFilters}>
+                    초기화
                   </Button>
-                }
-              />
-            ) : filteredItems.length > 0 ? (
-              <div className="tech-grid">
-                {filteredItems.map((item) => (
-                  <TechCard
-                    key={item.id}
-                    item={item}
-                    query={query}
-                    favorite={favorites.includes(item.id)}
-                    onOpen={setSelectedItem}
-                    onTagClick={toggleTag}
-                    onToggleFavorite={toggleFavorite}
-                  />
-                ))}
+                )}
               </div>
-            ) : (
-              <EmptyState onReset={resetFilters} />
-            )}
-          </section>
-        </div>
-      </main>
+              <CategoryFilter categories={categories} selected={activeCategory} counts={categoryCounts} onChange={setCategory} />
+              <TagFilter tags={popularTags} selectedTags={selectedTags} onToggle={toggleTag} />
+              <Button
+                className={`favorite-filter ${favoriteOnly ? 'is-active' : ''}`}
+                icon={<StarFilled />}
+                onClick={() => setFavoriteOnly((current) => !current)}
+              >
+                즐겨찾기만 보기 <span>{favorites.length}</span>
+              </Button>
+            </aside>
+
+            <div className="results-column">
+              {hasFilters && (
+                <div className="active-filters" aria-label="선택된 필터">
+                  <span>적용 중</span>
+                  {activeCategory !== '전체' && (
+                    <Tag closable onClose={() => setCategory('전체')}>
+                      {activeCategory}
+                    </Tag>
+                  )}
+                  {selectedTags.map((tag) => (
+                    <Tag key={tag} closable onClose={() => toggleTag(tag)}>
+                      {tag}
+                    </Tag>
+                  ))}
+                  {favoriteOnly && (
+                    <Tag closable onClose={() => setFavoriteOnly(false)}>
+                      즐겨찾기
+                    </Tag>
+                  )}
+                  <Button type="text" size="small" icon={<CloseOutlined />} onClick={resetFilters}>
+                    전체 해제
+                  </Button>
+                </div>
+              )}
+
+              {(query.trim() || selectedTags.length > 0) && <UnitBundles bundles={unitBundles} />}
+
+              <section className="results-section" aria-live="polite">
+                <div className="results-heading">
+                  <div>
+                    <span>기술·Unit 탐색</span>
+                    <h1>{query.trim() ? `“${query}” 검색 결과` : '전체 기술 목록'}</h1>
+                  </div>
+                  <p>
+                    총 <strong>{filteredItems.length}</strong>개 항목
+                  </p>
+                </div>
+
+                {loading && techItems.length === 0 ? (
+                  <div className="data-loading-state">
+                    <Spin size="large" />
+                    <p>기술 데이터를 불러오는 중이에요.</p>
+                  </div>
+                ) : error && techItems.length === 0 ? (
+                  <Result
+                    status="error"
+                    title="데이터를 불러오지 못했어요."
+                    subTitle="Google Sheets CSV 링크 또는 게시 상태를 확인해주세요."
+                    extra={
+                      <Button type="primary" onClick={() => void loadTechItems()}>
+                        다시 시도
+                      </Button>
+                    }
+                  />
+                ) : filteredItems.length > 0 ? (
+                  <div className="tech-grid">
+                    {filteredItems.map((item) => (
+                      <TechCard
+                        key={item.id}
+                        item={item}
+                        query={query}
+                        favorite={favorites.includes(item.id)}
+                        onOpen={setSelectedItem}
+                        onTagClick={toggleTag}
+                        onToggleFavorite={toggleFavorite}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState onReset={resetFilters} />
+                )}
+              </section>
+            </div>
+          </main>
+        </>
+      )}
 
       <TechDetailPanel
         item={selectedItem}
