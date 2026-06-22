@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { CopyOutlined, DownloadOutlined, FileTextOutlined } from '@ant-design/icons'
-import { Alert, Button, Tabs, Tag, message } from 'antd'
-import type { ExcelWorkbookSheet, Mission, PblDifficulty, PblPlan, Step } from '../types/pbl'
+import { Alert, Button, Dropdown, Tabs, Tag, message } from 'antd'
+import type { ExcelWorkbookSheet, Mission, PblDifficulty, PblPlan, Step, ValidationChecklistItem } from '../types/pbl'
 import type { RefineTargetType } from '../types/refine'
 import type { TechItem } from '../types/tech'
 import { formatPblDifficultyLabel, normalizePblDifficulty } from '../constants/pblDifficulty'
@@ -127,17 +127,12 @@ export function PblPlanResult({ plan, subjectName, techItems, historyCount, onPl
           <span>생성된 PBL 콘텐츠</span>
           <h2>{plan.project.title}</h2>
         </div>
-        <div className="pbl-result-actions">
-          <Button icon={<CopyOutlined />} onClick={() => void handleCopySheet(activeSheet)}>
-            선택 시트 엑셀로 복사
-          </Button>
-          <Button icon={<CopyOutlined />} onClick={() => void handleCopyWorkbook()}>
-            전체 시트 엑셀로 복사
-          </Button>
-          <Button icon={<DownloadOutlined />} onClick={() => downloadJson(plan)}>
-            JSON 다운로드
-          </Button>
-        </div>
+        <ExportActionsDropdown
+          activeSheet={activeSheet}
+          onCopySheet={handleCopySheet}
+          onCopyWorkbook={handleCopyWorkbook}
+          onDownloadJson={() => downloadJson(plan)}
+        />
       </div>
 
       <Tabs
@@ -146,17 +141,17 @@ export function PblPlanResult({ plan, subjectName, techItems, historyCount, onPl
         items={[
           {
             key: 'user-summary',
-            label: '사용자용 요약',
+            label: '프로젝트 요약',
             children: <UserSummaryTab plan={plan} subjectName={subjectName} />,
           },
           {
             key: 'mission-detail',
-            label: '미션 상세',
+            label: '미션 설계',
             children: <MissionDetailTab plan={plan} />,
           },
           {
             key: 'planner-review',
-            label: '기획자 검토',
+            label: '기획 검토',
             children: (
               <PlannerReviewTab
                 plan={plan}
@@ -169,7 +164,7 @@ export function PblPlanResult({ plan, subjectName, techItems, historyCount, onPl
           },
           {
             key: 'excel-json-data',
-            label: 'Excel/JSON 데이터',
+            label: '내보내기 데이터',
             children: (
               <ExcelJsonDataTab
                 plan={plan}
@@ -179,6 +174,9 @@ export function PblPlanResult({ plan, subjectName, techItems, historyCount, onPl
                 answerGuideGeneratingTarget={answerGuideGeneratingTarget}
                 onPlanUpdated={handlePlanUpdated}
                 onGenerateAnswerGuide={handleGenerateAnswerGuide}
+                onCopySheet={handleCopySheet}
+                onCopyWorkbook={handleCopyWorkbook}
+                onDownloadJson={() => downloadJson(plan)}
               />
             ),
           },
@@ -200,8 +198,50 @@ export function PblPlanResult({ plan, subjectName, techItems, historyCount, onPl
   )
 }
 
+function ExportActionsDropdown({
+  activeSheet,
+  onCopySheet,
+  onCopyWorkbook,
+  onDownloadJson,
+}: {
+  activeSheet?: ExcelWorkbookSheet
+  onCopySheet: (sheet: ExcelWorkbookSheet | undefined) => Promise<void>
+  onCopyWorkbook: () => Promise<void>
+  onDownloadJson: () => void
+}) {
+  return (
+    <Dropdown
+      trigger={['click']}
+      menu={{
+        items: [
+          {
+            key: 'json',
+            icon: <DownloadOutlined />,
+            label: 'JSON 다운로드',
+            onClick: onDownloadJson,
+          },
+          {
+            key: 'copy-workbook',
+            icon: <CopyOutlined />,
+            label: '전체 시트 TSV 복사',
+            onClick: () => void onCopyWorkbook(),
+          },
+          {
+            key: 'copy-sheet',
+            icon: <CopyOutlined />,
+            label: `선택 시트 TSV 복사${activeSheet ? ` (${activeSheet.sheetName})` : ''}`,
+            onClick: () => void onCopySheet(activeSheet),
+          },
+        ],
+      }}
+    >
+      <Button className="pbl-export-menu-button" icon={<DownloadOutlined />}>내보내기</Button>
+    </Dropdown>
+  )
+}
+
 function UserSummaryTab({ plan, subjectName }: { plan: PblPlan; subjectName: string }) {
-  const deviceCounts = getMissionDeviceCounts(plan)
+  const stepCounts = getPlanStepCounts(plan)
   const difficulty = getProjectDifficulty(plan)
 
   return (
@@ -233,14 +273,12 @@ function UserSummaryTab({ plan, subjectName }: { plan: PblPlan; subjectName: str
           </dl>
         </div>
         <div className="pbl-summary-tags">
-          <div className="pbl-project-facts">
-            <span>난이도 <strong>{formatPblDifficultyLabel(difficulty)}</strong></span>
-            <span>난이도 구분 <strong>{difficulty.description}</strong></span>
-            <span>평가 범위 <strong>{difficulty.evaluationScope}</strong></span>
-            <span>예상 기간 <strong>{plan.project.duration_label}</strong></span>
-            <span>모바일 미션 <strong>{deviceCounts.mobile}개</strong></span>
-            <span>PC 미션 <strong>{deviceCounts.pc}개</strong></span>
-            <span>총 미션 <strong>{plan.missions.length}개</strong></span>
+          <div className="pbl-project-fact-grid">
+            <SummaryFactCard label="난이도" value={formatPblDifficultyLabel(difficulty)} helper={difficulty.description} />
+            <SummaryFactCard label="예상 기간" value={plan.project.duration_label} />
+            <SummaryFactCard label="총 미션 수" value={`${plan.missions.length}개`} />
+            <SummaryFactCard label="모바일 수행 단계" value={`${stepCounts.mobile}개`} />
+            <SummaryFactCard label="PC 수행 단계" value={`${stepCounts.pc}개`} />
           </div>
           <span>미션 목록 요약</span>
           <div>
@@ -262,6 +300,16 @@ function UserSummaryTab({ plan, subjectName }: { plan: PblPlan; subjectName: str
         <summary>모바일/PC 학습 화면 미리보기</summary>
         <PblPreviewPanel plan={plan} />
       </details>
+    </div>
+  )
+}
+
+function SummaryFactCard({ label, value, helper }: { label: string; value: string; helper?: string }) {
+  return (
+    <div className="pbl-project-fact-card">
+      <span>{label}</span>
+      <strong>{value}</strong>
+      {helper && <small>{helper}</small>}
     </div>
   )
 }
@@ -300,19 +348,25 @@ function MissionDetailTab({ plan }: { plan: PblPlan }) {
             <div className="mission-section-heading">
               <span>Step 목록</span>
             </div>
-            <ol>
+            <div className="mission-step-card-list">
               {mission.steps.map((step) => {
                 const datasetHints = getStepDatasetHints(step)
                 return (
-                  <li key={step.step_id}>
-                    <strong>Step {step.step_order}: {step.title}</strong>
+                  <article className="mission-step-summary-card" key={step.step_id}>
+                    <span>Step {step.step_order}</span>
+                    <strong>{step.title}</strong>
+                    <div className="mission-step-card-tags">
+                      <Tag>{step.block_type}</Tag>
+                      <Tag>{step.device_target || step.required_device}</Tag>
+                      {step.learning_role && <Tag>{step.learning_role}</Tag>}
+                    </div>
                     {datasetHints.length > 0 && (
                       <p>활용 가능 데이터셋: {datasetHints.join(', ')}</p>
                     )}
-                  </li>
+                  </article>
                 )
               })}
-            </ol>
+            </div>
           </section>
 
           <AiUsageGuideBlock mission={mission} />
@@ -378,9 +432,23 @@ function PlannerReviewTab({
   onGenerateAnswerGuide: (targetMissionIndex?: number) => Promise<void>
 }) {
   const difficulty = getProjectDifficulty(plan)
+  const reviewSummary = summarizeValidationChecklist(plan.validation_checklist)
 
   return (
     <div className="planner-review-pane">
+      <section className="planner-review-summary">
+        <div>
+          <span>검토 요약</span>
+          <strong>오류 {reviewSummary.error}개 · 경고 {reviewSummary.warning}개 · 검토 필요 {reviewSummary.reviewNeeded}개</strong>
+        </div>
+        <div className="planner-review-summary-badges">
+          <Tag color="error">오류 {reviewSummary.error}</Tag>
+          <Tag color="warning">경고 {reviewSummary.warning}</Tag>
+          <Tag>검토 필요 {reviewSummary.reviewNeeded}</Tag>
+          <Tag color="success">정상 {reviewSummary.pass}</Tag>
+        </div>
+      </section>
+
       <article className="planner-review-card">
         <div className="mission-section-heading">
           <span>프로젝트 기획 메모</span>
@@ -429,6 +497,9 @@ function ExcelJsonDataTab({
   answerGuideGeneratingTarget,
   onPlanUpdated,
   onGenerateAnswerGuide,
+  onCopySheet,
+  onCopyWorkbook,
+  onDownloadJson,
 }: {
   plan: PblPlan
   techItems: TechItem[]
@@ -437,44 +508,67 @@ function ExcelJsonDataTab({
   answerGuideGeneratingTarget: 'all' | number | null
   onPlanUpdated: (plan: PblPlan, changeSummary?: string) => void
   onGenerateAnswerGuide: (targetMissionIndex?: number) => Promise<void>
+  onCopySheet: (sheet: ExcelWorkbookSheet | undefined) => Promise<void>
+  onCopyWorkbook: () => Promise<void>
+  onDownloadJson: () => void
 }) {
+  const activeSheet = plan.excelWorkbook.sheets.find((sheet) => sheet.sheetName === activeSheetName) || plan.excelWorkbook.sheets[0]
+
   return (
-    <Tabs
-      className="workbook-tabs"
-      defaultActiveKey="excel-workbook"
-      items={[
-        {
-          key: 'excel-workbook',
-          label: 'Excel workbook',
-          children: (
-            <Tabs
-              className="workbook-tabs"
-              activeKey={activeSheetName}
-              onChange={onSheetChange}
-              items={plan.excelWorkbook.sheets.map((sheet) => ({
-                key: sheet.sheetName,
-                label: getWorkbookTabLabel(sheet.sheetName),
-                children: (
-                  <WorkbookSheetPane
-                    plan={plan}
-                    sheet={sheet}
-                    techItems={techItems}
-                    answerGuideGeneratingTarget={answerGuideGeneratingTarget}
-                    onPlanUpdated={onPlanUpdated}
-                    onGenerateAnswerGuide={onGenerateAnswerGuide}
-                  />
-                ),
-              }))}
-            />
-          ),
-        },
-        {
-          key: 'json-preview',
-          label: 'JSON 미리보기',
-          children: <JsonPreviewPane plan={plan} />,
-        },
-      ]}
-    />
+    <div className="export-data-pane">
+      <section className="export-action-panel">
+        <div>
+          <span>내보내기</span>
+          <h3>플랫폼 입력용 데이터 내보내기</h3>
+          <p>검토가 끝난 PBL 콘텐츠를 JSON 또는 TSV 형태로 복사합니다.</p>
+        </div>
+        <div className="export-action-buttons">
+          <Button icon={<DownloadOutlined />} onClick={onDownloadJson}>JSON 다운로드</Button>
+          <Button icon={<CopyOutlined />} onClick={() => void onCopyWorkbook()}>전체 시트 TSV 복사</Button>
+          <Button icon={<CopyOutlined />} onClick={() => void onCopySheet(activeSheet)}>선택 시트 TSV 복사</Button>
+        </div>
+      </section>
+
+      <details className="advanced-data-view">
+        <summary>고급 데이터 보기</summary>
+        <Tabs
+          className="workbook-tabs"
+          defaultActiveKey="excel-workbook"
+          items={[
+            {
+              key: 'excel-workbook',
+              label: 'Workbook 시트',
+              children: (
+                <Tabs
+                  className="workbook-tabs"
+                  activeKey={activeSheetName}
+                  onChange={onSheetChange}
+                  items={plan.excelWorkbook.sheets.map((sheet) => ({
+                    key: sheet.sheetName,
+                    label: getWorkbookTabLabel(sheet.sheetName),
+                    children: (
+                      <WorkbookSheetPane
+                        plan={plan}
+                        sheet={sheet}
+                        techItems={techItems}
+                        answerGuideGeneratingTarget={answerGuideGeneratingTarget}
+                        onPlanUpdated={onPlanUpdated}
+                        onGenerateAnswerGuide={onGenerateAnswerGuide}
+                      />
+                    ),
+                  }))}
+                />
+              ),
+            },
+            {
+              key: 'json-preview',
+              label: 'JSON 미리보기',
+              children: <JsonPreviewPane plan={plan} />,
+            },
+          ]}
+        />
+      </details>
+    </div>
   )
 }
 
@@ -592,21 +686,35 @@ function BulletList({ items }: { items: string[] }) {
   )
 }
 
-function getMissionDeviceCounts(plan: PblPlan) {
+function getPlanStepCounts(plan: PblPlan) {
   return plan.missions.reduce(
     (counts, mission) => {
-      const hasMobile = mission.has_mobile_alternative
-        || mission.steps.some((step) => step.mobile_visible !== false && (step.device_target || step.required_device) !== 'pc')
-      const hasPc = mission.is_pc_required
-        || mission.steps.some((step) => step.pc_visible !== false && (step.device_target || step.required_device) !== 'mobile')
+      const missionCounts = mission.steps.reduce(
+        (stepCounts, step) => {
+          const visibility = getStepDeviceVisibility(step)
+          return {
+            mobile: stepCounts.mobile + (visibility.mobile ? 1 : 0),
+            pc: stepCounts.pc + (visibility.pc ? 1 : 0),
+          }
+        },
+        { mobile: 0, pc: 0 },
+      )
 
       return {
-        mobile: counts.mobile + (hasMobile ? 1 : 0),
-        pc: counts.pc + (hasPc ? 1 : 0),
+        mobile: counts.mobile + missionCounts.mobile,
+        pc: counts.pc + missionCounts.pc,
       }
     },
     { mobile: 0, pc: 0 },
   )
+}
+
+function getStepDeviceVisibility(step: Step) {
+  const target = step.device_target || step.required_device || step.device || 'mobile'
+  return {
+    mobile: step.mobile_visible !== false && target !== 'pc',
+    pc: step.pc_visible !== false && target !== 'mobile',
+  }
 }
 
 function getProjectDifficulty(plan: PblPlan): PblDifficulty {
@@ -1144,28 +1252,119 @@ function ValidationChecklistList({
   techItems: TechItem[]
   onPlanUpdated: (plan: PblPlan, changeSummary?: string) => void
 }) {
+  const urgentItems = plan.validation_checklist.filter(isUrgentValidationItem)
+  const referenceItems = plan.validation_checklist.filter(isReferenceValidationItem)
+  const generalItems = plan.validation_checklist.filter((item) =>
+    !urgentItems.includes(item) && !referenceItems.includes(item),
+  )
+
   return (
     <div className="json-checklist-list">
-      {plan.validation_checklist.map((item, index) => (
-        <article className="json-checklist-card" key={item.check_id}>
-          <div>
-            <span>{item.category}</span>
-            <strong>{item.check_item}</strong>
-            <p>{item.planner_criteria}</p>
-          </div>
-          <Tag>{item.status}</Tag>
-          <SectionRefineButton
-            currentPlan={plan}
-            targetPath={`validation_checklist[${index}]`}
-            targetType="validationChecklist"
-            targetData={item}
-            techItems={techItems}
-            onUpdated={onPlanUpdated}
-          />
-        </article>
-      ))}
+      <ValidationChecklistGroup
+        title="긴급 확인"
+        items={urgentItems}
+        plan={plan}
+        techItems={techItems}
+        onPlanUpdated={onPlanUpdated}
+      />
+      <ValidationChecklistGroup
+        title="일반 확인"
+        items={generalItems}
+        plan={plan}
+        techItems={techItems}
+        onPlanUpdated={onPlanUpdated}
+      />
+      <ValidationChecklistGroup
+        title="참고"
+        items={referenceItems}
+        plan={plan}
+        techItems={techItems}
+        onPlanUpdated={onPlanUpdated}
+      />
     </div>
   )
+}
+
+function ValidationChecklistGroup({
+  title,
+  items,
+  plan,
+  techItems,
+  onPlanUpdated,
+}: {
+  title: string
+  items: ValidationChecklistItem[]
+  plan: PblPlan
+  techItems: TechItem[]
+  onPlanUpdated: (plan: PblPlan, changeSummary?: string) => void
+}) {
+  if (items.length === 0) return null
+
+  return (
+    <section className="json-checklist-group">
+      <div className="json-checklist-group-heading">
+        <span>{title}</span>
+        <strong>{items.length}개 항목</strong>
+      </div>
+      {items.map((item) => {
+        const index = plan.validation_checklist.findIndex((checkItem) => checkItem.check_id === item.check_id)
+        return (
+          <article className="json-checklist-card" key={item.check_id}>
+            <div>
+              <span>{item.category}</span>
+              <strong>{item.check_item}</strong>
+              <p>{item.planner_criteria}</p>
+            </div>
+            <Tag color={getValidationStatusColor(item.status)}>{getValidationStatusLabel(item.status)}</Tag>
+            <SectionRefineButton
+              currentPlan={plan}
+              targetPath={`validation_checklist[${index}]`}
+              targetType="validationChecklist"
+              targetData={item}
+              techItems={techItems}
+              onUpdated={onPlanUpdated}
+            />
+          </article>
+        )
+      })}
+    </section>
+  )
+}
+
+function summarizeValidationChecklist(items: ValidationChecklistItem[]) {
+  return items.reduce(
+    (summary, item) => {
+      if (item.status === '통과') summary.pass += 1
+      else if (item.status === '보완 필요') {
+        summary.warning += 1
+        if (/오류|실제 군 내부 데이터|개인정보|보안/.test(`${item.category} ${item.check_item} ${item.planner_criteria}`)) {
+          summary.error += 1
+        }
+      } else summary.reviewNeeded += 1
+      return summary
+    },
+    { error: 0, warning: 0, reviewNeeded: 0, pass: 0 },
+  )
+}
+
+function isUrgentValidationItem(item: ValidationChecklistItem) {
+  return /난이도|모바일|PC|제약|평가/.test(`${item.category} ${item.check_item}`)
+}
+
+function isReferenceValidationItem(item: ValidationChecklistItem) {
+  return /개발|내부|피어리뷰|AI 교관/.test(`${item.category} ${item.check_item}`)
+}
+
+function getValidationStatusColor(status: ValidationChecklistItem['status']) {
+  if (status === '통과') return 'success'
+  if (status === '보완 필요') return 'warning'
+  return 'default'
+}
+
+function getValidationStatusLabel(status: ValidationChecklistItem['status']) {
+  if (status === '통과') return '정상'
+  if (status === '보완 필요') return '경고'
+  return '검토 필요'
 }
 
 function InlineRefineList({

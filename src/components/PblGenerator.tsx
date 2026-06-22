@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { DeleteOutlined, FolderOpenOutlined, HistoryOutlined, ThunderboltOutlined } from '@ant-design/icons'
+import { DeleteOutlined, FolderOpenOutlined, HistoryOutlined, SettingOutlined, ThunderboltOutlined } from '@ant-design/icons'
 import { Alert, Button, Input, Select, Tag } from 'antd'
 import {
   DEFAULT_PBL_DIFFICULTY_LEVEL,
@@ -33,15 +33,16 @@ import {
 } from '../utils/pblGenerationHistory'
 import { PblPlanResult } from './PblPlanResult'
 
-const HISTORY_PAGE_SIZE = 5
+const HISTORY_PAGE_SIZE = 3
 
 type PblGeneratorProps = {
   techItems: TechItem[]
   isTechItemsLoading: boolean
   onLoadTechItems: () => Promise<TechItem[] | null>
+  onResultVisibleChange?: (visible: boolean) => void
 }
 
-export function PblGenerator({ techItems, isTechItemsLoading, onLoadTechItems }: PblGeneratorProps) {
+export function PblGenerator({ techItems, isTechItemsLoading, onLoadTechItems, onResultVisibleChange }: PblGeneratorProps) {
   const [subjectName, setSubjectName] = useState('')
   const [plan, setPlan] = useState<PblPlan | null>(null)
   const [planHistory, setPlanHistory] = useState<PblPlan[]>([])
@@ -53,7 +54,12 @@ export function PblGenerator({ techItems, isTechItemsLoading, onLoadTechItems }:
     loadPblGenerationHistory(),
   )
   const [activeHistoryId, setActiveHistoryId] = useState<string | null>(null)
+  const [advancedSettingsOpen, setAdvancedSettingsOpen] = useState(false)
   const selectedDifficulty = getPblDifficultyByLevel(selectedDifficultyLevel)
+
+  useEffect(() => {
+    onResultVisibleChange?.(Boolean(plan))
+  }, [onResultVisibleChange, plan])
 
   const replaceHistoryRecords = (records: PblGenerationHistoryRecord[]) => {
     const savedRecords = savePblGenerationHistory(records)
@@ -237,22 +243,6 @@ export function PblGenerator({ techItems, isTechItemsLoading, onLoadTechItems }:
             />
           </label>
 
-          <label className="pbl-generator-field pbl-model-field">
-            <span>생성 모델</span>
-            <Select<GenerationModelId>
-              className="pbl-model-select"
-              size="large"
-              value={generationModel}
-              aria-label="생성 모델"
-              disabled={generating}
-              options={GENERATION_MODEL_OPTIONS.map((option) => ({
-                value: option.id,
-                label: `${option.provider}: ${option.modelName}`,
-              }))}
-              onChange={setGenerationModel}
-            />
-          </label>
-
           <div className="pbl-generate-button-field">
             <Button
               type="primary"
@@ -265,12 +255,40 @@ export function PblGenerator({ techItems, isTechItemsLoading, onLoadTechItems }:
               {generating ? '생성 중...' : '콘텐츠 생성'}
             </Button>
           </div>
+
+          <div className="pbl-generator-advanced">
+            <Button
+              type="text"
+              size="small"
+              icon={<SettingOutlined />}
+              onClick={() => setAdvancedSettingsOpen((current) => !current)}
+            >
+              {advancedSettingsOpen ? '고급 설정 접기' : '고급 설정 펼치기'}
+            </Button>
+            {advancedSettingsOpen && (
+              <label className="pbl-generator-field pbl-model-field">
+                <span>생성 모델</span>
+                <Select<GenerationModelId>
+                  className="pbl-model-select"
+                  size="large"
+                  value={generationModel}
+                  aria-label="생성 모델"
+                  disabled={generating}
+                  options={GENERATION_MODEL_OPTIONS.map((option) => ({
+                    value: option.id,
+                    label: `${option.provider}: ${option.modelName}`,
+                  }))}
+                  onChange={setGenerationModel}
+                />
+              </label>
+            )}
+          </div>
         </div>
 
         <div className="pbl-difficulty-help">
           <strong>선택된 난이도: {formatPblDifficultyLabel(selectedDifficulty)}</strong>
           <span>구분: {selectedDifficulty.description}</span>
-          <span>평가기준: {selectedDifficulty.evaluationScope}</span>
+          <span>평가 기준: {formatDifficultyEvaluationScope(selectedDifficulty.evaluationScope)}</span>
           <p>선택한 난이도에 맞춰 미션 범위, 평가 기준, 산출물 수준이 조정됩니다.</p>
         </div>
 
@@ -280,6 +298,7 @@ export function PblGenerator({ techItems, isTechItemsLoading, onLoadTechItems }:
           key={generationRecords[0]?.id ?? 'empty'}
           records={generationRecords}
           activeHistoryId={activeHistoryId}
+          isResultVisible={Boolean(plan)}
           onOpen={handleOpenHistoryRecord}
           onDelete={handleDeleteHistoryRecord}
           onClear={handleClearHistory}
@@ -303,39 +322,52 @@ export function PblGenerator({ techItems, isTechItemsLoading, onLoadTechItems }:
 function PblGenerationHistoryPanel({
   records,
   activeHistoryId,
+  isResultVisible,
   onOpen,
   onDelete,
   onClear,
 }: {
   records: PblGenerationHistoryRecord[]
   activeHistoryId: string | null
+  isResultVisible: boolean
   onOpen: (record: PblGenerationHistoryRecord) => void
   onDelete: (recordId: string) => void
   onClear: () => void
 }) {
+  const [historyExpandedInResult, setHistoryExpandedInResult] = useState(false)
   const [visibleRecordCount, setVisibleRecordCount] = useState(HISTORY_PAGE_SIZE)
   const visibleRecords = records.slice(0, visibleRecordCount)
   const hiddenRecordCount = Math.max(records.length - visibleRecords.length, 0)
+  const collapsed = isResultVisible && !historyExpandedInResult
 
   return (
-    <section className="pbl-history-panel" aria-label="PBL 생성 이력">
+    <section className={`pbl-history-panel${collapsed ? ' is-collapsed' : ''}`} aria-label="PBL 생성 이력">
       <div className="pbl-history-heading">
         <div>
           <span><HistoryOutlined /> 생성 이력</span>
-          <strong>{records.length}개 저장됨</strong>
+          <strong>{collapsed ? `${records.length}개 저장됨 · 접힘` : `최근 ${Math.min(HISTORY_PAGE_SIZE, records.length)}개 표시`}</strong>
         </div>
-        <Button
-          size="small"
-          danger
-          icon={<DeleteOutlined />}
-          disabled={records.length === 0}
-          onClick={onClear}
-        >
-          전체 삭제
-        </Button>
+        <div className="pbl-history-heading-actions">
+          {isResultVisible && (
+            <Button size="small" onClick={() => setHistoryExpandedInResult((current) => !current)}>
+              {collapsed ? '생성 이력 보기' : '생성 이력 접기'}
+            </Button>
+          )}
+          <Button
+            size="small"
+            danger
+            icon={<DeleteOutlined />}
+            disabled={records.length === 0}
+            onClick={onClear}
+          >
+            전체 삭제
+          </Button>
+        </div>
       </div>
 
-      {records.length === 0 ? (
+      {collapsed ? (
+        <p className="pbl-history-empty">생성 결과 검토에 집중할 수 있도록 이력을 접어두었습니다.</p>
+      ) : records.length === 0 ? (
         <p className="pbl-history-empty">저장된 생성 이력이 없습니다.</p>
       ) : (
         <>
@@ -381,6 +413,19 @@ function PblGenerationHistoryPanel({
       )}
     </section>
   )
+}
+
+function formatDifficultyEvaluationScope(value: string) {
+  const labelMap: Record<string, string> = {
+    '평가기준 불가': '기초 수행 확인 중심',
+    '평가기준 일부 포함': '일부 평가 기준 포함',
+    'CCTV만 분석': '제한된 데이터 분석 기준',
+    '현재 프로젝트 최소 목표': '고급 프로젝트 최소 목표',
+    '권장 최종 목표': '실전형 권장 목표',
+    '범위 초과': '생성 범위 초과',
+  }
+
+  return labelMap[value] || value
 }
 
 function formatHistoryDate(value: string) {

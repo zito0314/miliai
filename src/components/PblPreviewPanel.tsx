@@ -127,13 +127,18 @@ export function PblPreviewPanel({ plan }: PblPreviewPanelProps) {
             onChange={setActiveMissionId}
             options={activeProject.missions.map((mission) => ({
               value: mission.mission_id,
-              label: `${mission.mission_order}. ${mission.title}`,
+              label: (
+                <MissionSelectLabel
+                  mission={mission}
+                  active={mission.mission_id === activeMission.mission_id}
+                />
+              ),
             }))}
           />
         </label>
         <div className="pbl-preview-progress">
           <span>{deviceMode === 'mobile' ? '모바일 표시' : 'PC 표시'}</span>
-          <strong>{visibleStepCount}개 step · full {fullStepCount}개</strong>
+          <strong>{visibleStepCount}개 step · 직접 수행 {fullStepCount}개</strong>
           <Progress percent={getProgressPercent(fullStepCount, visibleStepCount)} size="small" showInfo={false} />
         </div>
       </div>
@@ -285,10 +290,36 @@ function PcPreviewLayout({
             onResponseChange={onResponseChange}
           />
         ) : (
-          <Empty description="표시할 step이 없습니다." />
+          <PreviewEmptyState mission={mission} />
         )}
         <SubmissionPreviewCard mission={mission} mode="pc" />
       </main>
+    </div>
+  )
+}
+
+function MissionSelectLabel({ mission, active }: { mission: PreviewMission; active: boolean }) {
+  const counts = getPreviewMissionCounts(mission)
+
+  return (
+    <div className={`pbl-preview-mission-option${active ? ' is-active' : ''}`}>
+      <strong>{active ? '✓ ' : ''}{mission.mission_order}. {mission.title}</strong>
+      <span>모바일 {counts.mobile} step · PC {counts.pc} step</span>
+    </div>
+  )
+}
+
+function PreviewEmptyState({ mission }: { mission: PreviewMission }) {
+  const hasSubmission = Boolean(mission.submission)
+
+  return (
+    <div className="pbl-preview-empty-state">
+      <strong>{hasSubmission ? '이 미션의 PC 수행 단계는 제출/평가 영역에서 진행됩니다.' : '이 미션은 모바일 중심 미션입니다.'}</strong>
+      <p>
+        {hasSubmission
+          ? 'PC에서는 아래 제출물 작성 또는 최종 검토 단계로 이어집니다.'
+          : 'PC에서는 제출물 작성 또는 최종 검토 단계에서 이어집니다.'}
+      </p>
     </div>
   )
 }
@@ -783,6 +814,16 @@ function getOptionValue(option: { option_id?: string; option_value?: string; opt
 function getProgressPercent(fullStepCount: number, visibleStepCount: number) {
   if (visibleStepCount === 0) return 0
   return Math.round((fullStepCount / visibleStepCount) * 100)
+}
+
+function getPreviewMissionCounts(mission: PreviewMission) {
+  return mission.steps.reduce(
+    (counts, step) => ({
+      mobile: counts.mobile + (getPreviewDisplayVariant(step, 'mobile') !== 'hidden' ? 1 : 0),
+      pc: counts.pc + (getPreviewDisplayVariant(step, 'pc') !== 'hidden' ? 1 : 0),
+    }),
+    { mobile: 0, pc: 0 },
+  )
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
