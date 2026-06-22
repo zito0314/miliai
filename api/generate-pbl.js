@@ -266,6 +266,7 @@ export const pblPlanSchema = pblContentSchema.extend({
 const defaultGeminiModel = 'gemini-2.5-flash'
 const defaultGroqModel = 'llama-3.3-70b-versatile'
 const defaultMaxOutputTokens = 30000
+const defaultGeminiRetryAttempts = 2
 const groqBlueprintMaxCompletionTokens = 1600
 const groqMissionMaxCompletionTokens = 2800
 const defaultGroqStageDelayMs = 65000
@@ -401,18 +402,23 @@ export default async function handler(request, response) {
     return response.status(400).json({ error: '과목명을 입력해주세요.' })
   }
 
-  const apiKey = generationModel.provider === 'groq'
+  const primaryApiKey = generationModel.provider === 'groq'
     ? process.env.GROQ_API_KEY
     : process.env.GEMINI_API_KEY
-  if (!apiKey) {
+  if (!primaryApiKey) {
     return response.status(500).json({ error: `서버에 ${generationModel.providerLabel} API Key가 설정되지 않았습니다.` })
   }
 
   try {
     const subject = subjectName.slice(0, 200)
-    const generationResult = generationModel.provider === 'groq'
-      ? await generateWithGroqStaged({ apiKey, model: generationModel.model, subjectName: subject, techContext, referenceUrls, selectedDifficulty })
-      : await generateWithGemini({ apiKey, model: generationModel.model, prompt: buildPrompt(subject, techContext, referenceUrls, selectedDifficulty), referenceUrls })
+    const generationResult = await generatePblContentWithFallback({
+      generationModel,
+      primaryApiKey,
+      subjectName: subject,
+      techContext,
+      referenceUrls,
+      selectedDifficulty,
+    })
 
     const generatedPlan = parseGeminiJson(generationResult.text)
     if (!generatedPlan) {
@@ -432,10 +438,62 @@ export default async function handler(request, response) {
       ...(generationResult.warning ? { warning: generationResult.warning } : {}),
     })
   } catch (error) {
-    console.error('PBL generation failed', error)
-    return response.status(502).json({
-      error: '콘텐츠 생성 중 오류가 발생했어요. 잠시 후 다시 시도해주세요.',
+    const transientOverload = isTransientModelOverloadError(error)
+    const statusCode = transientOverload ? 503 : 502
+    console[transientOverload ? 'warn' : 'error']('PBL generation failed', summarizeGenerationError(error))
+    return response.status(statusCode).json({
+      error: getGenerationFailureMessage(error, generationModel),
     })
+  }
+}
+
+async function generatePblContentWithFallback({
+  generationModel,
+  primaryApiKey,
+  subjectName,
+  techContext,
+  referenceUrls,
+  selectedDifficulty,
+}) {
+  if (generationModel.provider === 'groq') {
+    return generateWithGroqStaged({
+      apiKey: primaryApiKey,
+      model: generationModel.model,
+      subjectName,
+      techContext,
+      referenceUrls,
+      selectedDifficulty,
+    })
+  }
+
+  try {
+    return await generateWithGeminiWithRetry({
+      apiKey: primaryApiKey,
+      model: generationModel.model,
+      prompt: buildPrompt(subjectName, techContext, referenceUrls, selectedDifficulty),
+      referenceUrls,
+    })
+  } catch (error) {
+    const fallbackApiKey = process.env.GROQ_API_KEY
+    if (!fallbackApiKey || !isTransientModelOverloadError(error)) throw error
+
+    console.warn('Gemini PBL generation is unavailable. Falling back to Groq.', summarizeGenerationError(error))
+    const fallbackResult = await generateWithGroqStaged({
+      apiKey: fallbackApiKey,
+      model: defaultGroqModel,
+      subjectName,
+      techContext,
+      referenceUrls,
+      selectedDifficulty,
+    })
+
+    return {
+      ...fallbackResult,
+      warning: [
+        'Gemini 모델 수요가 높아 Groq 대체 모델로 PBL 초안을 생성했어요.',
+        fallbackResult.warning,
+      ].filter(Boolean).join(' '),
+    }
   }
 }
 
@@ -519,6 +577,65 @@ async function generateWithGemini({ apiKey, model, prompt, referenceUrls }) {
     warning: failedUrls.length
       ? '기준 문서 URL을 일부 확인하지 못했지만, 기본 생성 규칙으로 PBL 초안을 생성했어요.'
       : null,
+  }
+}
+
+async function generateWithGeminiWithRetry(args) {
+  const maxAttempts = resolveGeminiRetryAttempts()
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      return await generateWithGemini(args)
+    } catch (error) {
+      if (attempt >= maxAttempts || !isTransientModelOverloadError(error)) throw error
+
+      const retryDelayMs = 900 * attempt
+      console.warn('Gemini PBL generation hit a transient overload. Retrying.', {
+        attempt,
+        maxAttempts,
+        retryDelayMs,
+        error: summarizeGenerationError(error),
+      })
+      await sleep(retryDelayMs)
+    }
+  }
+
+  throw new Error('Gemini가 재시도 후에도 응답하지 않았습니다.')
+}
+
+function resolveGeminiRetryAttempts() {
+  const configured = Number.parseInt(process.env.GEMINI_RETRY_ATTEMPTS || '', 10)
+  if (Number.isFinite(configured) && configured > 0) {
+    return Math.min(configured, 4)
+  }
+  return defaultGeminiRetryAttempts
+}
+
+function isTransientModelOverloadError(error) {
+  const source = [
+    error?.status,
+    error?.code,
+    error?.message,
+    error?.cause?.message,
+    typeof error === 'string' ? error : '',
+  ].filter(Boolean).join(' ')
+
+  return /503|unavailable|high demand|overloaded|temporarily unavailable|try again later/i.test(source)
+}
+
+function getGenerationFailureMessage(error, generationModel) {
+  if (isTransientModelOverloadError(error)) {
+    return `${generationModel.providerLabel} 모델 수요가 높아 지금은 응답이 지연되고 있어요. 잠시 후 다시 시도하거나 고급 설정에서 Groq 모델을 선택해주세요.`
+  }
+  return '콘텐츠 생성 중 오류가 발생했어요. 잠시 후 다시 시도해주세요.'
+}
+
+function summarizeGenerationError(error) {
+  return {
+    name: error?.name,
+    status: error?.status,
+    code: error?.code,
+    message: error?.message || String(error),
   }
 }
 
