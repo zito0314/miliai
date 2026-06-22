@@ -1,4 +1,6 @@
 :root {
+  --page-bg: #f2f5f4;
+  --generator-bg: #ffffff;
   --ink: #17211f;
   --muted: #62706c;
   --line: #dce4e1;
@@ -16,7 +18,7 @@
 
 .app-shell {
   min-height: 100svh;
-  background: #f2f5f4;
+  background: var(--page-bg);
   color: var(--ink);
 }
 
@@ -81,7 +83,7 @@
 
 .search-section {
   border-bottom: 1px solid #cfd9d5;
-  background: #e8efed;
+  background: var(--page-bg);
 }
 
 .data-status-section {
@@ -177,7 +179,7 @@
 
 .pbl-generator-section {
   border-bottom: 1px solid #ccd8d4;
-  background: #f6f8f7;
+  background: var(--generator-bg);
 }
 
 .pbl-generator-inner {
@@ -224,8 +226,7 @@
 }
 
 .pbl-generator-form .pbl-difficulty-select .ant-select-selector,
-.pbl-generator-form .pbl-model-select .ant-select-selector,
-.pbl-generate-button-field .ant-btn {
+.pbl-generator-form .pbl-model-select .ant-select-selector {
   min-height: 56px;
 }
 
@@ -258,7 +259,9 @@
 }
 
 .pbl-generate-button-field .ant-btn {
+  height: 40px;
   min-width: 142px;
+  padding-inline: 18px;
 }
 
 .pbl-generator-advanced {
@@ -324,6 +327,20 @@
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
+}
+
+.pbl-history-heading-actions .ant-btn {
+  height: 24px;
+  padding: 0 8px;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1;
+}
+
+.pbl-history-heading-actions .ant-btn > span,
+.pbl-history-heading-actions .ant-btn .anticon {
+  font-size: 12px;
+  line-height: 1;
 }
 
 .pbl-history-heading > div {
