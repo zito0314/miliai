@@ -10,6 +10,25 @@ const contentStatusSchema = z.enum(['draft', 'draft_ready_for_test', 'review_nee
 const requiredDeviceSchema = z.enum(['mobile', 'pc', 'both'])
 const learningRoleSchema = z.enum(['understand', 'decide', 'assemble', 'review', 'execute', 'submit'])
 const validationStatusSchema = z.enum(['검토 필요', '통과', '보완 필요'])
+const pblDifficultyOptions = [
+  { level: 1, label: '1레벨 · 초급', description: '기본 코딩 실습', evaluationScope: '평가기준 불가' },
+  { level: 2, label: '2레벨 · 초급', description: '단일 알고리즘 구현', evaluationScope: '평가기준 불가' },
+  { level: 3, label: '3레벨 · 초급', description: '데이터 분석', evaluationScope: '평가기준 불가' },
+  { level: 4, label: '4레벨 · 중급', description: '단일 AI 모델 학습', evaluationScope: '평가기준 일부 포함' },
+  { level: 5, label: '5레벨 · 중급', description: '웹/앱 + AI 연결', evaluationScope: '평가기준 일부 포함' },
+  { level: 6, label: '6레벨 · 중급', description: '단일 데이터 기반 AI 서비스', evaluationScope: 'CCTV만 분석' },
+  { level: 7, label: '7레벨 · 고급', description: '실시간 AI 시스템', evaluationScope: '실시간 영상 탐지' },
+  { level: 8, label: '8레벨 · 고급', description: '멀티모달 AI + 운영 시스템', evaluationScope: '현재 프로젝트 최소 목표' },
+  { level: 9, label: '9레벨 · 고급', description: '현장 적용 가능한 AI 서비스', evaluationScope: '권장 최종 목표' },
+  { level: 10, label: '10레벨 · 마스터', description: '대규모 상용·군 운용 체계', evaluationScope: '범위 초과', disabled: true },
+]
+const defaultPblDifficulty = pblDifficultyOptions.find((option) => option.level === 3)
+const pblDifficultySchema = z.object({
+  level: z.number(),
+  label: z.string(),
+  description: z.string(),
+  evaluationScope: z.string(),
+})
 
 export const projectSchema = z.object({
   project_id: z.string(),
@@ -18,6 +37,8 @@ export const projectSchema = z.object({
   environment_type: z.string(),
   duration_label: z.string(),
   target_learner: z.string(),
+  difficulty: pblDifficultySchema,
+  difficulty_level: z.number().optional(),
   difficulty_label: z.string(),
   project_goal: z.string(),
   learning_mode: z.string(),
@@ -374,6 +395,7 @@ export default async function handler(request, response) {
   const techContext = typeof body?.techContext === 'string' ? body.techContext.trim().slice(0, 30000) : ''
   const referenceUrls = normalizeReferenceUrls(body?.referenceUrls)
   const generationModel = resolveGenerationModel(body?.generationModel)
+  const selectedDifficulty = normalizePblDifficulty(body?.difficulty)
 
   if (!subjectName) {
     return response.status(400).json({ error: '과목명을 입력해주세요.' })
@@ -389,15 +411,15 @@ export default async function handler(request, response) {
   try {
     const subject = subjectName.slice(0, 200)
     const generationResult = generationModel.provider === 'groq'
-      ? await generateWithGroqStaged({ apiKey, model: generationModel.model, subjectName: subject, techContext, referenceUrls })
-      : await generateWithGemini({ apiKey, model: generationModel.model, prompt: buildPrompt(subject, techContext, referenceUrls), referenceUrls })
+      ? await generateWithGroqStaged({ apiKey, model: generationModel.model, subjectName: subject, techContext, referenceUrls, selectedDifficulty })
+      : await generateWithGemini({ apiKey, model: generationModel.model, prompt: buildPrompt(subject, techContext, referenceUrls, selectedDifficulty), referenceUrls })
 
     const generatedPlan = parseGeminiJson(generationResult.text)
     if (!generatedPlan) {
       throw new Error(`${generationModel.providerLabel} 응답을 JSON으로 파싱하지 못했습니다.`)
     }
 
-    const normalizedPlan = rebuildPblPlanWorkbook(normalizePblPlan(generatedPlan, subjectName))
+    const normalizedPlan = rebuildPblPlanWorkbook(normalizePblPlan(generatedPlan, subjectName, selectedDifficulty))
     const parsed = pblPlanSchema.safeParse(normalizedPlan)
     if (!parsed.success) {
       console.error('PBL schema validation issues', parsed.error.issues.slice(0, 12))
@@ -436,6 +458,38 @@ function resolveGenerationModel(value) {
   }
 }
 
+function normalizePblDifficulty(value) {
+  const raw = asObject(value)
+  const requestedLevel = Number(raw.level ?? raw.difficulty_level)
+  const labelLevel = Number.parseInt(asString(raw.label || raw.difficulty_label).match(/\d+/)?.[0] || '', 10)
+  const option = pblDifficultyOptions.find((difficulty) => difficulty.level === requestedLevel && !difficulty.disabled)
+    || pblDifficultyOptions.find((difficulty) => difficulty.level === labelLevel && !difficulty.disabled)
+    || defaultPblDifficulty
+
+  return {
+    level: option.level,
+    label: option.label,
+    description: option.description,
+    evaluationScope: option.evaluationScope,
+  }
+}
+
+function formatDifficultyLabel(difficulty) {
+  return `${difficulty.level}레벨(${difficulty.label.split('·')[1]?.trim() || '초급'})`
+}
+
+function formatDifficultyForPrompt(difficulty) {
+  return [
+    `- 레벨: ${difficulty.level}`,
+    `- 구분: ${difficulty.label}`,
+    `- 설명: ${difficulty.description}`,
+    `- 평가기준 범위: ${difficulty.evaluationScope}`,
+    '',
+    '생성하는 모든 프로젝트 개요, 미션, Step, 제출물, 평가 기준은 반드시 위 난이도에 맞춰야 한다.',
+    '다른 난이도로 임의 변경하지 않는다.',
+  ].join('\n')
+}
+
 async function generateWithGemini({ apiKey, model, prompt, referenceUrls }) {
   const ai = new GoogleGenAI({ apiKey })
   const { prompt: geminiPrompt, failedUrls } = await appendFetchedReferenceContent(prompt, referenceUrls)
@@ -468,7 +522,7 @@ async function generateWithGemini({ apiKey, model, prompt, referenceUrls }) {
   }
 }
 
-async function generateWithGroqStaged({ apiKey, model, subjectName, techContext, referenceUrls }) {
+async function generateWithGroqStaged({ apiKey, model, subjectName, techContext, referenceUrls, selectedDifficulty }) {
   const { referenceBrief, failedUrls } = await buildGroqReferenceBrief(referenceUrls)
   const compactTechContext = compactText(techContext, groqTechContextMaxChars)
   const stageDelayMs = resolveGroqStageDelayMs()
@@ -485,7 +539,7 @@ async function generateWithGroqStaged({ apiKey, model, subjectName, techContext,
     apiKey,
     model,
     stageName: 'blueprint',
-    prompt: buildGroqBlueprintPrompt({ subjectName, techContext: compactTechContext, referenceBrief }),
+    prompt: buildGroqBlueprintPrompt({ subjectName, techContext: compactTechContext, referenceBrief, selectedDifficulty }),
     maxCompletionTokens: groqBlueprintMaxCompletionTokens,
   })
 
@@ -507,6 +561,7 @@ async function generateWithGroqStaged({ apiKey, model, subjectName, techContext,
         project,
         missionBrief,
         missionIndex: index,
+        selectedDifficulty,
       }),
       maxCompletionTokens: groqMissionMaxCompletionTokens,
     })
@@ -622,7 +677,7 @@ async function buildGroqReferenceBrief(referenceUrls) {
   }
 }
 
-function buildGroqBlueprintPrompt({ subjectName, techContext, referenceBrief }) {
+function buildGroqBlueprintPrompt({ subjectName, techContext, referenceBrief, selectedDifficulty }) {
   return `너는 Mili AI PBL 콘텐츠 기획자다.
 Groq TPM 한도 안에서 단계별로 생성한다. 이번 단계는 전체 PBL의 "프로젝트 개요와 미션 골격"만 만든다.
 반드시 JSON object만 반환한다. 마크다운, 코드블록, 설명 문장은 반환하지 않는다.
@@ -635,6 +690,14 @@ ${techContext || '별도 기술 컨텍스트 없음'}
 
 [기준 문서 요약]
 ${referenceBrief}
+
+[사용자가 선택한 PBL 난이도]
+${formatDifficultyForPrompt(selectedDifficulty)}
+
+[난이도 고정 규칙]
+사용자가 선택한 난이도는 절대 변경하지 않는다.
+프로젝트 개요의 PBL 난이도는 반드시 선택된 난이도와 동일해야 한다.
+미션 수, Step 난이도, 제출물 수준, 평가 기준은 선택된 난이도에 맞게 조정한다.
 
 [작성 원칙]
 - PBL-first, Mission-Based Learning 방식으로 작성한다.
@@ -653,7 +716,9 @@ ${referenceBrief}
     "environment_type": "모바일 중심 + PC 검증형",
     "duration_label": "예: 3주 / 모바일 세션 + PC 검증",
     "target_learner": "AI 활용 경험이 많지 않은 군 장병",
-    "difficulty_label": "3레벨(초급)~4레벨(중급)",
+    "difficulty": ${JSON.stringify(selectedDifficulty)},
+    "difficulty_level": ${selectedDifficulty.level},
+    "difficulty_label": "${formatDifficultyLabel(selectedDifficulty)}",
     "project_goal": "최종 학습 목표",
     "learning_mode": "모바일 카드 활동, AI 교관 질문, PC 검증",
     "prerequisites": "선수 지식",
@@ -709,7 +774,7 @@ missions는 정확히 2개만 반환한다.
 모든 문자열은 한국어로 구체적으로 작성한다.`
 }
 
-function buildGroqMissionPrompt({ subjectName, techContext, referenceBrief, project, missionBrief, missionIndex }) {
+function buildGroqMissionPrompt({ subjectName, techContext, referenceBrief, project, missionBrief, missionIndex, selectedDifficulty }) {
   const stepPattern = getGroqMissionStepPattern(missionIndex)
 
   return `너는 Mili AI PBL 콘텐츠 기획자다.
@@ -729,6 +794,15 @@ ${compactText(techContext, 1600) || '별도 기술 컨텍스트 없음'}
 
 [기준 문서 요약]
 ${compactText(referenceBrief, 1200)}
+
+[사용자가 선택한 PBL 난이도]
+${formatDifficultyForPrompt(selectedDifficulty)}
+
+[난이도 고정 규칙]
+이번 미션의 Step, 제출물, 평가 기준은 선택된 난이도 범위를 넘지 않는다.
+사용자가 3레벨을 선택했다면 AI 모델 학습이나 실시간 시스템 구축을 필수 요구하지 않는다.
+사용자가 5레벨을 선택했다면 단순 데이터 분석만으로 끝내지 말고 웹/앱과 AI 연결 흐름을 포함한다.
+사용자가 8레벨을 선택했다면 멀티모달 데이터와 운영 시스템 흐름을 포함한다.
 
 [이번 미션의 step 패턴]
 ${stepPattern}
@@ -949,6 +1023,10 @@ function normalizeRawGithubUrl(value, fallback) {
 }
 
 export function validatePlanConsistency(plan) {
+  if (!plan.project?.difficulty || plan.project.difficulty.level === 10) {
+    throw new Error('project.difficulty는 1~9레벨 범위의 PBL 난이도 객체여야 합니다.')
+  }
+
   if (!Array.isArray(plan.missions) || plan.missions.length < 2 || plan.missions.length > 4) {
     throw new Error('missions 길이는 2~4 사이여야 합니다.')
   }
@@ -989,9 +1067,9 @@ export function validatePlanConsistency(plan) {
   })
 }
 
-export function normalizePblPlan(generatedPlan, fallbackSubjectName) {
+export function normalizePblPlan(generatedPlan, fallbackSubjectName, requestDifficulty) {
   const rawPlan = asObject(generatedPlan)
-  const project = normalizeProject(rawPlan.project, fallbackSubjectName)
+  const project = normalizeProject(rawPlan.project, fallbackSubjectName, requestDifficulty)
   const missions = normalizeMissions(rawPlan.missions, project)
   const answerGuides = normalizeAnswerGuides(rawPlan.answerGuides, missions)
 
@@ -1000,7 +1078,7 @@ export function normalizePblPlan(generatedPlan, fallbackSubjectName) {
     missions,
     ui_blocks: normalizeUiBlocks(rawPlan.ui_blocks),
     environment_tags: normalizeEnvironmentTags(rawPlan.environment_tags),
-    validation_checklist: normalizeValidationChecklist(rawPlan.validation_checklist),
+    validation_checklist: normalizeValidationChecklist(rawPlan.validation_checklist, project, missions),
     ...(answerGuides.length ? { answerGuides } : {}),
   }
 }
@@ -1016,10 +1094,15 @@ export function rebuildPblPlanWorkbook(plan) {
   }
 }
 
-function normalizeProject(value, fallbackSubjectName) {
+function normalizeProject(value, fallbackSubjectName, requestDifficulty) {
   const rawProject = asObject(value)
   const title = asString(rawProject.title, `${fallbackSubjectName || 'MiliAI'} 실무 문제 해결 PBL`)
   const projectId = sanitizeProjectId(rawProject.project_id, title || fallbackSubjectName)
+  const difficulty = normalizePblDifficulty(requestDifficulty || {
+    ...asObject(rawProject.difficulty),
+    level: rawProject.difficulty?.level ?? rawProject.difficulty_level,
+    label: rawProject.difficulty?.label || rawProject.difficulty_label,
+  })
 
   return {
     project_id: projectId,
@@ -1028,7 +1111,9 @@ function normalizeProject(value, fallbackSubjectName) {
     environment_type: asString(rawProject.environment_type, '모바일 중심 + PC 검증형'),
     duration_label: asString(rawProject.duration_label, '4주 / 모바일 세션 8회(회당 15~25분) + PC 검증 세션 2회(회당 60분)'),
     target_learner: asString(rawProject.target_learner, 'AI 활용 경험이 많지 않은 군 장병'),
-    difficulty_label: asString(rawProject.difficulty_label, '3레벨(초급)~4레벨(중급)'),
+    difficulty,
+    difficulty_level: difficulty.level,
+    difficulty_label: formatDifficultyLabel(difficulty),
     project_goal: asString(rawProject.project_goal, '비식별 또는 가상 데이터를 바탕으로 실무 문제를 정의하고 개선안을 제안합니다.'),
     learning_mode: asString(rawProject.learning_mode, '모바일 카드 활동, AI 교관 질문, 동료 피드백, PC 검증 실습을 병행합니다.'),
     prerequisites: asString(rawProject.prerequisites, '기본 문서 작성, 표 데이터 읽기, 생성형 AI 활용 원칙'),
@@ -1266,12 +1351,13 @@ function normalizeEnvironmentTags(value) {
   })) : defaultEnvironmentTags()
 }
 
-function normalizeValidationChecklist(value) {
+function normalizeValidationChecklist(value, project, missions) {
   const rawItems = asArray(value)
   const fallback = defaultValidationChecklist()
   const count = Math.min(10, Math.max(6, rawItems.length || fallback.length))
+  const difficultyCheck = buildDifficultyChecklistItem(project, missions)
 
-  return Array.from({ length: count }, (_, index) => {
+  const normalizedItems = Array.from({ length: count }, (_, index) => {
     const rawItem = asObject(rawItems[index] || fallback[index % fallback.length])
     const fallbackItem = fallback[index % fallback.length]
     return {
@@ -1283,6 +1369,44 @@ function normalizeValidationChecklist(value) {
       status: normalizeEnum(rawItem.status, validationStatuses, '검토 필요'),
     }
   })
+    .filter((item) => item.check_id !== difficultyCheck.check_id && item.category !== difficultyCheck.category)
+
+  return [difficultyCheck, ...normalizedItems].slice(0, 10)
+}
+
+function buildDifficultyChecklistItem(project, missions) {
+  const difficulty = normalizePblDifficulty(project?.difficulty)
+  const conflictReason = getDifficultyConflictReason(difficulty, [project, ...missions])
+
+  return {
+    check_id: 'CHK-DIFFICULTY',
+    category: 'PBL 난이도',
+    check_item: `${formatDifficultyLabel(difficulty)} 범위와 미션/평가 기준이 일치하는가?`,
+    planner_criteria: conflictReason
+      ? `선택 난이도와 충돌 가능성이 있습니다: ${conflictReason}`
+      : `${difficulty.description} 수준과 ${difficulty.evaluationScope} 범위를 기준으로 검토합니다.`,
+    developer_criteria: 'project.difficulty, difficulty_level, difficulty_label을 동일 기준으로 저장하고 화면/엑셀/JSON에 같은 값으로 노출합니다.',
+    status: conflictReason ? '보완 필요' : '검토 필요',
+  }
+}
+
+function getDifficultyConflictReason(difficulty, values) {
+  const sourceText = values.map((value) => JSON.stringify(value)).join(' ')
+
+  if (difficulty.level <= 3 && /AI 모델 학습|모델 학습|딥러닝|실시간|웹\/앱|서비스 구축|멀티모달|운영 시스템/.test(sourceText)) {
+    return '초급 난이도에는 AI 모델 학습, 실시간 시스템, 웹/앱 서비스 구축을 필수 요구하지 않아야 합니다.'
+  }
+  if (difficulty.level === 4 && /멀티모달|실시간 영상|운영 시스템|현장 적용 서비스/.test(sourceText)) {
+    return '4레벨은 단일 AI 모델 학습 중심이며 실시간/멀티모달 운영 시스템은 과합니다.'
+  }
+  if (difficulty.level >= 5 && difficulty.level <= 6 && /대규모 상용|군 운용 체계|멀티모달 운영|실시간 영상 탐지/.test(sourceText)) {
+    return '중급 난이도는 단일 데이터 기반 서비스 수준으로 제한해야 합니다.'
+  }
+  if (difficulty.level >= 8 && /퀴즈만|데이터 요약만|간단한 코드만|기본 코딩 실습/.test(sourceText)) {
+    return '고급 난이도에는 운영 시나리오, 검증, 개선 계획 등 복합 수행 흐름이 필요합니다.'
+  }
+
+  return ''
 }
 
 function normalizeBlockType(value, inputType, index) {
@@ -1495,7 +1619,10 @@ function buildProjectRows(plan) {
     'environment_type',
     'duration_label',
     'target_learner',
+    'difficulty_level',
     'difficulty_label',
+    'difficulty_description',
+    'difficulty_evaluation_scope',
     'project_goal',
     'learning_mode',
     'prerequisites',
@@ -1509,7 +1636,15 @@ function buildProjectRows(plan) {
     'developer_note',
   ]
 
-  return [header, header.map((key) => toCell(plan.project[key]))]
+  const projectRowValues = {
+    ...plan.project,
+    difficulty_level: plan.project.difficulty?.level ?? plan.project.difficulty_level,
+    difficulty_label: plan.project.difficulty_label,
+    difficulty_description: plan.project.difficulty?.description,
+    difficulty_evaluation_scope: plan.project.difficulty?.evaluationScope,
+  }
+
+  return [header, header.map((key) => toCell(projectRowValues[key]))]
 }
 
 function buildMissionRows(missions) {
@@ -1881,7 +2016,7 @@ function cloneJsonSchema(value) {
   return JSON.parse(JSON.stringify(value))
 }
 
-function buildPrompt(subjectName, techContext, referenceUrls) {
+function buildPrompt(subjectName, techContext, referenceUrls, selectedDifficulty) {
   return `너는 Mili AI PBL 콘텐츠 기획자다.
 
 학습자에게 바로 보여줄 카드형 요약이 아니라, 플랫폼에 입력 가능한 JSON-ready PBL 콘텐츠 구조를 생성한다.
@@ -1895,6 +2030,9 @@ function buildPrompt(subjectName, techContext, referenceUrls) {
 
 [사용자 입력 과목명]
 ${subjectName}
+
+[사용자가 선택한 PBL 난이도]
+${formatDifficultyForPrompt(selectedDifficulty)}
 
 [참고 기술 사전]
 ${techContext || '별도 기술 컨텍스트 없음'}
@@ -1969,9 +2107,75 @@ ${pblDifficultyGuide}
 작성 규칙:
 
 * 일반 장병 대상 PBL은 기본적으로 3~6레벨 사이에서 생성한다.
+* 단, 사용자가 선택한 PBL 난이도가 있으면 그 선택값을 최우선 기준으로 따른다.
 * 실전형 고급 프로젝트는 7~9레벨까지 허용한다.
 * 레벨 10은 현재 콘텐츠 생성 범위 초과로 간주하고 생성하지 않는다.
 * project.difficulty_label은 숫자 레벨과 구분명을 함께 쓴다. 예: 5레벨(중급), 8레벨(고급)
+* project.difficulty는 반드시 사용자가 선택한 PBL 난이도 객체와 동일하게 작성한다.
+* project.difficulty_level은 사용자가 선택한 PBL 난이도 level과 동일하게 작성한다.
+
+[난이도별 생성 기준]
+
+1레벨(초급): 기본 코딩 실습
+- 변수, 조건문, 반복문, 간단한 입출력 중심
+- 평가 기준은 최소화
+- 최종 산출물은 간단한 코드 또는 실행 결과
+
+2레벨(초급): 단일 알고리즘 구현
+- 정렬, 탐색, 조건 처리 등 단일 알고리즘 중심
+- 복잡한 서비스 구조 금지
+- 평가 기준은 최소화
+
+3레벨(초급): 데이터 분석
+- CSV, 표, 로그 데이터를 읽고 기초 분석 수행
+- pandas, Excel, SQL 기초 활용 가능
+- 시각화, 요약 리포트 수준의 산출물 권장
+- AI 모델 학습은 필수로 요구하지 않음
+
+4레벨(중급): 단일 AI 모델 학습
+- 하나의 데이터셋으로 분류/회귀/예측 모델 학습
+- 모델 성능 평가 일부 포함
+- 웹/앱 서비스 구현은 요구하지 않음
+
+5레벨(중급): 웹/앱 + AI 연결
+- 간단한 웹/앱 화면과 AI 모델 또는 API 연결
+- 사용자가 입력하고 결과를 확인하는 흐름 포함
+- 서비스 완성도보다 연결 구조 이해를 중시
+
+6레벨(중급): 단일 데이터 기반 AI 서비스
+- 특정 데이터 기반의 AI 서비스 흐름 설계
+- 데이터 수집, 전처리, 모델, 결과 화면 일부 포함
+- 실시간 시스템이나 멀티모달 통합은 요구하지 않음
+
+7레벨(고급): 실시간 AI 시스템
+- 실시간 데이터 처리, 경보, 모니터링 개념 포함
+- 단, 실제 군 데이터가 아닌 공개/가상 데이터 기준
+- 성능과 안정성 평가를 일부 포함
+
+8레벨(고급): 멀티모달 AI + 운영 시스템
+- 이미지/영상/텍스트/센서 등 2개 이상의 데이터 유형 결합
+- 운영 시나리오, 관리자 확인, 오류 대응 흐름 포함
+- 현재 프로젝트의 최소 고급 목표로 사용 가능
+
+9레벨(고급): 현장 적용 가능한 AI 서비스
+- 실제 부대 업무 적용을 가정한 완성도 높은 서비스 설계
+- 사용자 역할, 운영 프로세스, 검증, 개선 계획 포함
+- 권장 최종 목표 수준
+
+10레벨(마스터): 대규모 상용·군 운용 체계
+- 현재 콘텐츠 생성 범위 초과
+- 생성하지 않는다
+
+[난이도 고정 규칙]
+
+사용자가 선택한 난이도는 절대 변경하지 않는다.
+프로젝트 개요의 PBL 난이도는 반드시 선택된 난이도와 동일해야 한다.
+미션 수, Step 난이도, 제출물 수준, 평가 기준은 선택된 난이도에 맞게 조정한다.
+
+예:
+사용자가 3레벨을 선택했다면, AI 모델 학습이나 실시간 시스템 구축을 필수 요구하지 않는다.
+사용자가 5레벨을 선택했다면, 단순 데이터 분석만으로 끝내지 말고 웹/앱과 AI 연결 흐름을 포함한다.
+사용자가 8레벨을 선택했다면, 멀티모달 데이터와 운영 시스템 흐름을 포함한다.
 
 ---
 

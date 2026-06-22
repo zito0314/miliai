@@ -1,4 +1,5 @@
 export type ContentStatus = 'draft' | 'draft_ready_for_test' | 'review_needed' | 'approved'
+export type PblDifficultyLevel = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10
 export type PblBlockType =
   | 'situation_card'
   | 'concept_card'
@@ -30,6 +31,13 @@ export type PblPlan = {
   excelWorkbook: ExcelWorkbook
 }
 
+export type PblDifficulty = {
+  level: PblDifficultyLevel
+  label: string
+  description: string
+  evaluationScope: string
+}
+
 export type Project = {
   project_id: string
   title: string
@@ -37,6 +45,8 @@ export type Project = {
   environment_type: string
   duration_label: string
   target_learner: string
+  difficulty?: PblDifficulty
+  difficulty_level?: number
   difficulty_label: string
   project_goal: string
   learning_mode: string

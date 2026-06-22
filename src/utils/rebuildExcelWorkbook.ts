@@ -60,7 +60,10 @@ function buildProjectRows(plan: PblPlan) {
     'environment_type',
     'duration_label',
     'target_learner',
+    'difficulty_level',
     'difficulty_label',
+    'difficulty_description',
+    'difficulty_evaluation_scope',
     'project_goal',
     'learning_mode',
     'prerequisites',
@@ -73,10 +76,17 @@ function buildProjectRows(plan: PblPlan) {
     'planner_note',
     'developer_note',
   ]
+  const projectRowValues: Record<string, unknown> = {
+    ...plan.project,
+    difficulty_level: plan.project.difficulty?.level ?? plan.project.difficulty_level,
+    difficulty_label: plan.project.difficulty_label,
+    difficulty_description: plan.project.difficulty?.description,
+    difficulty_evaluation_scope: plan.project.difficulty?.evaluationScope,
+  }
 
   return [
     header,
-    header.map((key) => toCell(plan.project[key as keyof typeof plan.project])),
+    header.map((key) => toCell(projectRowValues[key])),
   ]
 }
 

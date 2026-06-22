@@ -3,6 +3,7 @@ import type {
   EnvironmentTag,
   LearningRole,
   Mission,
+  PblDifficulty,
   PblBlockType,
   PblPlan,
   Project,
@@ -14,6 +15,7 @@ import type {
   ValidationChecklistItem,
   ValidationStatus,
 } from '../types/pbl'
+import { formatPblDifficultyLabel, normalizePblDifficulty } from '../constants/pblDifficulty'
 import { rebuildExcelWorkbook } from './rebuildExcelWorkbook'
 
 const contentStatuses: ContentStatus[] = ['draft', 'draft_ready_for_test', 'review_needed', 'approved']
@@ -130,7 +132,7 @@ export function normalizePblPlan(plan: PblPlan): PblPlan {
     missions,
     ui_blocks: normalizeUiBlocks(plan.ui_blocks),
     environment_tags: normalizeEnvironmentTags(plan.environment_tags),
-    validation_checklist: normalizeValidationChecklist(plan.validation_checklist),
+    validation_checklist: normalizeValidationChecklist(plan.validation_checklist, project, missions),
     answerGuides: plan.answerGuides?.filter((guide) =>
       missions.some((mission) => mission.mission_id === guide.mission_id),
     ),
@@ -145,6 +147,7 @@ export function normalizePblPlan(plan: PblPlan): PblPlan {
 
 function normalizeProject(project: Project): Project {
   const projectId = sanitizeProjectId(project?.project_id, project?.title || 'PBL')
+  const difficulty = normalizeProjectDifficulty(project)
 
   return {
     project_id: projectId,
@@ -153,7 +156,9 @@ function normalizeProject(project: Project): Project {
     environment_type: asString(project?.environment_type, '모바일 중심 + PC 검증형'),
     duration_label: asString(project?.duration_label, '4주 / 모바일 세션 8회(회당 15~25분) + PC 검증 세션 2회(회당 60분)'),
     target_learner: asString(project?.target_learner, 'AI 활용 경험이 많지 않은 군 장병'),
-    difficulty_label: asString(project?.difficulty_label, '3레벨(초급)~4레벨(중급)'),
+    difficulty,
+    difficulty_level: difficulty.level,
+    difficulty_label: formatPblDifficultyLabel(difficulty),
     project_goal: asString(project?.project_goal, '비식별 또는 가상 데이터를 바탕으로 실무 문제를 정의하고 개선안을 제안합니다.'),
     learning_mode: asString(project?.learning_mode, '모바일 카드 활동, AI 교관 질문, 동료 피드백, PC 검증 실습을 병행합니다.'),
     prerequisites: asString(project?.prerequisites, '기본 문서 작성, 표 데이터 읽기, 생성형 AI 활용 원칙'),
@@ -166,6 +171,16 @@ function normalizeProject(project: Project): Project {
     planner_note: asString(project?.planner_note, '기획자 검토 필요: 프로젝트 의도, 모바일 수행성, PC 검증 범위, 평가 가능성, 비식별/가상 데이터 사용 원칙을 확인하세요.'),
     developer_note: asString(project?.developer_note, '개발 참고: project_id를 기준으로 missions, steps, submissions를 연결하고 모바일/PC 표시 방식과 저장 데이터를 매핑하세요.'),
   }
+}
+
+function normalizeProjectDifficulty(project: Project | undefined): PblDifficulty {
+  return normalizePblDifficulty({
+    ...(project?.difficulty || {}),
+    level: typeof project?.difficulty?.level === 'number'
+      ? project.difficulty.level
+      : project?.difficulty_level,
+    label: project?.difficulty?.label || project?.difficulty_label,
+  })
 }
 
 function normalizeMissions(missions: Mission[], project: Project) {
@@ -383,12 +398,17 @@ function normalizeEnvironmentTags(tags: EnvironmentTag[] | undefined) {
   return Array.isArray(tags) && tags.length ? tags : defaultEnvironmentTags()
 }
 
-function normalizeValidationChecklist(items: ValidationChecklistItem[] | undefined) {
+function normalizeValidationChecklist(
+  items: ValidationChecklistItem[] | undefined,
+  project: Project,
+  missions: Mission[],
+) {
   const source = Array.isArray(items) ? items : []
   const fallback = defaultValidationChecklist()
   const count = Math.min(10, Math.max(6, source.length || fallback.length))
+  const difficultyCheck = buildDifficultyChecklistItem(project, missions)
 
-  return Array.from({ length: count }, (_, index) => {
+  const normalized = Array.from({ length: count }, (_, index) => {
     const item = source[index] || fallback[index % fallback.length]
     return {
       check_id: asString(item.check_id, `CHK-${String(index + 1).padStart(2, '0')}`),
@@ -399,6 +419,44 @@ function normalizeValidationChecklist(items: ValidationChecklistItem[] | undefin
       status: normalizeEnum(item.status, validationStatuses, '검토 필요'),
     }
   })
+    .filter((item) => item.check_id !== difficultyCheck.check_id && item.category !== difficultyCheck.category)
+
+  return [difficultyCheck, ...normalized].slice(0, 10)
+}
+
+function buildDifficultyChecklistItem(project: Project, missions: Mission[]): ValidationChecklistItem {
+  const difficulty = normalizeProjectDifficulty(project)
+  const conflictReason = getDifficultyConflictReason(difficulty, [project, ...missions])
+
+  return {
+    check_id: 'CHK-DIFFICULTY',
+    category: 'PBL 난이도',
+    check_item: `${formatPblDifficultyLabel(difficulty)} 범위와 미션/평가 기준이 일치하는가?`,
+    planner_criteria: conflictReason
+      ? `선택 난이도와 충돌 가능성이 있습니다: ${conflictReason}`
+      : `${difficulty.description} 수준과 ${difficulty.evaluationScope} 범위를 기준으로 검토합니다.`,
+    developer_criteria: 'project.difficulty, difficulty_level, difficulty_label을 동일 기준으로 저장하고 화면/엑셀/JSON에 같은 값으로 노출합니다.',
+    status: conflictReason ? '보완 필요' : '검토 필요',
+  }
+}
+
+function getDifficultyConflictReason(difficulty: PblDifficulty, values: unknown[]) {
+  const sourceText = values.map((value) => JSON.stringify(value)).join(' ')
+
+  if (difficulty.level <= 3 && /AI 모델 학습|모델 학습|딥러닝|실시간|웹\/앱|서비스 구축|멀티모달|운영 시스템/.test(sourceText)) {
+    return '초급 난이도에는 AI 모델 학습, 실시간 시스템, 웹/앱 서비스 구축을 필수 요구하지 않아야 합니다.'
+  }
+  if (difficulty.level === 4 && /멀티모달|실시간 영상|운영 시스템|현장 적용 서비스/.test(sourceText)) {
+    return '4레벨은 단일 AI 모델 학습 중심이며 실시간/멀티모달 운영 시스템은 과합니다.'
+  }
+  if (difficulty.level >= 5 && difficulty.level <= 6 && /대규모 상용|군 운용 체계|멀티모달 운영|실시간 영상 탐지/.test(sourceText)) {
+    return '중급 난이도는 단일 데이터 기반 서비스 수준으로 제한해야 합니다.'
+  }
+  if (difficulty.level >= 8 && /퀴즈만|데이터 요약만|간단한 코드만|기본 코딩 실습/.test(sourceText)) {
+    return '고급 난이도에는 운영 시나리오, 검증, 개선 계획 등 복합 수행 흐름이 필요합니다.'
+  }
+
+  return ''
 }
 
 export function defaultUiBlocks(): UiBlockDictionaryItem[] {

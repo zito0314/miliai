@@ -2,6 +2,12 @@ import { useEffect, useState } from 'react'
 import { DeleteOutlined, FolderOpenOutlined, HistoryOutlined, ThunderboltOutlined } from '@ant-design/icons'
 import { Alert, Button, Input, Select, Tag } from 'antd'
 import {
+  DEFAULT_PBL_DIFFICULTY_LEVEL,
+  PBL_DIFFICULTY_OPTIONS,
+  formatPblDifficultyLabel,
+  getPblDifficultyByLevel,
+} from '../constants/pblDifficulty'
+import {
   DEFAULT_GENERATION_MODEL_ID,
   GENERATION_MODEL_OPTIONS,
   type GenerationModelId,
@@ -42,10 +48,12 @@ export function PblGenerator({ techItems, isTechItemsLoading, onLoadTechItems }:
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [generationModel, setGenerationModel] = useState<GenerationModelId>(DEFAULT_GENERATION_MODEL_ID)
+  const [selectedDifficultyLevel, setSelectedDifficultyLevel] = useState<number>(DEFAULT_PBL_DIFFICULTY_LEVEL)
   const [generationRecords, setGenerationRecords] = useState<PblGenerationHistoryRecord[]>(() =>
     loadPblGenerationHistory(),
   )
   const [activeHistoryId, setActiveHistoryId] = useState<string | null>(null)
+  const selectedDifficulty = getPblDifficultyByLevel(selectedDifficultyLevel)
 
   const replaceHistoryRecords = (records: PblGenerationHistoryRecord[]) => {
     const savedRecords = savePblGenerationHistory(records)
@@ -95,7 +103,7 @@ export function PblGenerator({ techItems, isTechItemsLoading, onLoadTechItems }:
         return
       }
 
-      const generatedPlan = await generatePblPlan(trimmedSubject, techItemsForGeneration, generationModel)
+      const generatedPlan = await generatePblPlan(trimmedSubject, techItemsForGeneration, generationModel, selectedDifficulty)
       const historyRecord = createPblGenerationHistoryRecord(generatedPlan, generationModel)
       setPlan(generatedPlan)
       setPlanHistory([])
@@ -194,41 +202,76 @@ export function PblGenerator({ techItems, isTechItemsLoading, onLoadTechItems }:
         </div>
 
         <div className="pbl-generator-form">
-          <Input
-            size="large"
-            value={subjectName}
-            placeholder="예: 데이터 기반 조달 및 소요예측"
-            aria-label="PBL 과목명"
-            onChange={(event) => {
-              setSubjectName(event.target.value)
-              if (error === '과목명을 입력해주세요.') setError(null)
-            }}
-            onPressEnter={() => {
-              if (!generating && !waitingForInitialTechItems) void handleGenerate()
-            }}
-          />
-          <Select<GenerationModelId>
-            className="pbl-model-select"
-            size="large"
-            value={generationModel}
-            aria-label="생성 모델"
-            disabled={generating}
-            options={GENERATION_MODEL_OPTIONS.map((option) => ({
-              value: option.id,
-              label: `${option.provider}: ${option.modelName}`,
-            }))}
-            onChange={setGenerationModel}
-          />
-          <Button
-            type="primary"
-            size="large"
-            icon={<ThunderboltOutlined />}
-            loading={generating}
-            disabled={waitingForInitialTechItems}
-            onClick={() => void handleGenerate()}
-          >
-            {generating ? '생성 중...' : '콘텐츠 생성'}
-          </Button>
+          <label className="pbl-generator-field pbl-subject-field">
+            <span>과목명/주제</span>
+            <Input
+              size="large"
+              value={subjectName}
+              placeholder="예: 데이터 기반 조달 및 소요예측"
+              aria-label="PBL 과목명"
+              onChange={(event) => {
+                setSubjectName(event.target.value)
+                if (error === '과목명을 입력해주세요.') setError(null)
+              }}
+              onPressEnter={() => {
+                if (!generating && !waitingForInitialTechItems) void handleGenerate()
+              }}
+            />
+          </label>
+
+          <label className="pbl-generator-field pbl-difficulty-field">
+            <span>PBL 난이도</span>
+            <Select<number>
+              className="pbl-difficulty-select"
+              size="large"
+              value={selectedDifficulty.level}
+              placeholder="난이도를 선택해 주세요"
+              aria-label="PBL 난이도"
+              disabled={generating}
+              options={PBL_DIFFICULTY_OPTIONS.map((option) => ({
+                value: option.level,
+                disabled: option.disabled,
+                label: `${option.label} - ${option.description}`,
+              }))}
+              onChange={setSelectedDifficultyLevel}
+            />
+          </label>
+
+          <label className="pbl-generator-field pbl-model-field">
+            <span>생성 모델</span>
+            <Select<GenerationModelId>
+              className="pbl-model-select"
+              size="large"
+              value={generationModel}
+              aria-label="생성 모델"
+              disabled={generating}
+              options={GENERATION_MODEL_OPTIONS.map((option) => ({
+                value: option.id,
+                label: `${option.provider}: ${option.modelName}`,
+              }))}
+              onChange={setGenerationModel}
+            />
+          </label>
+
+          <div className="pbl-generate-button-field">
+            <Button
+              type="primary"
+              size="large"
+              icon={<ThunderboltOutlined />}
+              loading={generating}
+              disabled={waitingForInitialTechItems}
+              onClick={() => void handleGenerate()}
+            >
+              {generating ? '생성 중...' : '콘텐츠 생성'}
+            </Button>
+          </div>
+        </div>
+
+        <div className="pbl-difficulty-help">
+          <strong>선택된 난이도: {formatPblDifficultyLabel(selectedDifficulty)}</strong>
+          <span>구분: {selectedDifficulty.description}</span>
+          <span>평가기준: {selectedDifficulty.evaluationScope}</span>
+          <p>선택한 난이도에 맞춰 미션 범위, 평가 기준, 산출물 수준이 조정됩니다.</p>
         </div>
 
         {error && <Alert className="pbl-generator-error" type="error" showIcon title={error} />}

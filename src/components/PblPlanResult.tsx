@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react'
 import { CopyOutlined, DownloadOutlined, FileTextOutlined } from '@ant-design/icons'
 import { Alert, Button, Tabs, Tag, message } from 'antd'
-import type { ExcelWorkbookSheet, Mission, PblPlan, Step } from '../types/pbl'
+import type { ExcelWorkbookSheet, Mission, PblDifficulty, PblPlan, Step } from '../types/pbl'
 import type { RefineTargetType } from '../types/refine'
 import type { TechItem } from '../types/tech'
+import { formatPblDifficultyLabel, normalizePblDifficulty } from '../constants/pblDifficulty'
 import { generateAnswerGuide } from '../services/generateAnswerGuide'
 import { copyWorkbookAsTsv, copyWorkbookSheetAsTsv } from '../utils/copyPblPlanAsTsv'
 import { downloadJson } from '../utils/downloadJson'
@@ -201,6 +202,7 @@ export function PblPlanResult({ plan, subjectName, techItems, historyCount, onPl
 
 function UserSummaryTab({ plan, subjectName }: { plan: PblPlan; subjectName: string }) {
   const deviceCounts = getMissionDeviceCounts(plan)
+  const difficulty = getProjectDifficulty(plan)
 
   return (
     <div className="user-summary-pane">
@@ -232,7 +234,9 @@ function UserSummaryTab({ plan, subjectName }: { plan: PblPlan; subjectName: str
         </div>
         <div className="pbl-summary-tags">
           <div className="pbl-project-facts">
-            <span>난이도 <strong>{plan.project.difficulty_label}</strong></span>
+            <span>난이도 <strong>{formatPblDifficultyLabel(difficulty)}</strong></span>
+            <span>난이도 구분 <strong>{difficulty.description}</strong></span>
+            <span>평가 범위 <strong>{difficulty.evaluationScope}</strong></span>
             <span>예상 기간 <strong>{plan.project.duration_label}</strong></span>
             <span>모바일 미션 <strong>{deviceCounts.mobile}개</strong></span>
             <span>PC 미션 <strong>{deviceCounts.pc}개</strong></span>
@@ -373,6 +377,8 @@ function PlannerReviewTab({
   onPlanUpdated: (plan: PblPlan, changeSummary?: string) => void
   onGenerateAnswerGuide: (targetMissionIndex?: number) => Promise<void>
 }) {
+  const difficulty = getProjectDifficulty(plan)
+
   return (
     <div className="planner-review-pane">
       <article className="planner-review-card">
@@ -380,6 +386,10 @@ function PlannerReviewTab({
           <span>프로젝트 기획 메모</span>
         </div>
         <dl className="json-detail-grid">
+          <div>
+            <dt>선택 PBL 난이도</dt>
+            <dd>{formatPblDifficultyLabel(difficulty)} · {difficulty.description} · 평가 범위: {difficulty.evaluationScope}</dd>
+          </div>
           <div>
             <dt>최종 성적 산출 방식</dt>
             <dd>{summarizeFinalEvaluation(plan)}</dd>
@@ -597,6 +607,14 @@ function getMissionDeviceCounts(plan: PblPlan) {
     },
     { mobile: 0, pc: 0 },
   )
+}
+
+function getProjectDifficulty(plan: PblPlan): PblDifficulty {
+  return normalizePblDifficulty({
+    ...(plan.project.difficulty || {}),
+    level: plan.project.difficulty?.level ?? plan.project.difficulty_level,
+    label: plan.project.difficulty?.label || plan.project.difficulty_label,
+  })
 }
 
 function getAiUsageGuide(mission: Mission) {

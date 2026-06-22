@@ -2,6 +2,7 @@ import { GoogleGenAI } from '@google/genai'
 import { z } from 'zod'
 import {
   answerGuideSchema,
+  normalizePblPlan,
   parseGeminiJson,
   pblPlanSchema,
   rebuildPblPlanWorkbook,
@@ -85,10 +86,10 @@ export default async function handler(request, response) {
       throw new Error('생성된 예상 답안이 대상 미션과 연결되지 않았습니다.')
     }
 
-    const updatedPlan = rebuildPblPlanWorkbook({
+    const updatedPlan = rebuildPblPlanWorkbook(normalizePblPlan({
       ...currentPlan,
       answerGuides: mergeAnswerGuides(currentPlan.answerGuides, answerGuides),
-    })
+    }, currentPlan.project?.title, getPlanDifficulty(currentPlan)))
     const parsedPlan = pblPlanSchema.safeParse(updatedPlan)
     if (!parsedPlan.success) {
       console.error('Answer guide updated plan validation issues', parsedPlan.error.issues.slice(0, 12))
@@ -202,6 +203,8 @@ function getMissionNumber(missionId) {
 }
 
 function buildAnswerGuidePrompt({ currentPlan, targetMissions, techContext }) {
+  const difficultyContext = describePlanDifficulty(currentPlan)
+
   return `너는 Mili AI PBL 콘텐츠 검수자이자 해설 설계자다.
 
 목표: 학습자에게 공개할 정답지가 아니라, 기획자가 미션지를 검토하고 평가 기준을 보완하기 위한 기획자용 예상 답안 가이드를 생성한다.
@@ -232,6 +235,11 @@ function buildAnswerGuidePrompt({ currentPlan, targetMissions, techContext }) {
 14. code_fill_blank, code_error_finding, result_prediction은 코드 예시와 해설을 우선 생성한다.
 15. situation_card, concept_card는 정답보다 검토 포인트와 예상 응답 중심으로 작성한다.
 16. pc_verification, submission은 제출물 검토 기준과 PASS/FAIL 예시 중심으로 작성한다.
+17. 예상 답안, 참고 코드, 평가 예시는 현재 PBL 난이도 범위에 맞춘다.
+18. 초급 난이도는 기초 분석과 판단 근거 중심으로, 중급 난이도는 연결 구조와 부분 평가 중심으로, 고급 난이도는 운영 시나리오와 검증 기준 중심으로 작성한다.
+
+[현재 PBL 난이도]
+${difficultyContext}
 
 [현재 PBL 계획]
 ${stringifyForPrompt(stripExcelWorkbook(currentPlan))}
@@ -270,6 +278,31 @@ function stripExcelWorkbook(plan) {
   const contentPlan = { ...plan }
   delete contentPlan.excelWorkbook
   return contentPlan
+}
+
+function describePlanDifficulty(plan) {
+  const difficulty = getPlanDifficulty(plan)
+  return [
+    difficulty.level ? `${difficulty.level}레벨` : '',
+    difficulty.label,
+    difficulty.description,
+    difficulty.evaluationScope ? `평가 범위: ${difficulty.evaluationScope}` : '',
+  ].filter(Boolean).join(' · ') || 'plan.project.difficulty 기준'
+}
+
+function getPlanDifficulty(plan) {
+  const project = plan?.project || {}
+  const difficulty = project.difficulty || {}
+  const levelFromLabel = Number.parseInt(asString(difficulty.label || project.difficulty_label).match(/\d+/)?.[0] || '', 10)
+  const level = Number.isFinite(Number(difficulty.level ?? project.difficulty_level))
+    ? Number(difficulty.level ?? project.difficulty_level)
+    : levelFromLabel
+  return {
+    level,
+    label: asString(difficulty.label || project.difficulty_label),
+    description: asString(difficulty.description),
+    evaluationScope: asString(difficulty.evaluationScope),
+  }
 }
 
 function asString(value) {

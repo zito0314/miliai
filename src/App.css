@@ -181,29 +181,73 @@
 
 .pbl-generator-form {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(250px, 320px) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(230px, 280px) minmax(230px, 280px) auto;
+  align-items: end;
   gap: 10px;
   margin-top: 26px;
 }
 
 .pbl-generator-form .ant-input,
+.pbl-generator-form .pbl-difficulty-select .ant-select-selector,
 .pbl-generator-form .pbl-model-select .ant-select-selector,
 .pbl-generator-form .ant-btn {
   min-height: 56px;
 }
 
+.pbl-generator-field {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.pbl-generator-field > span {
+  color: #53635e;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.pbl-generator-form .pbl-difficulty-select,
 .pbl-generator-form .pbl-model-select {
   min-width: 0;
 }
 
+.pbl-generator-form .pbl-difficulty-select .ant-select-selection-item,
 .pbl-generator-form .pbl-model-select .ant-select-selection-item {
   color: #26332f;
   font-size: 13px;
   font-weight: 700;
 }
 
+.pbl-generate-button-field {
+  display: grid;
+}
+
 .pbl-generator-form .ant-btn {
   min-width: 142px;
+}
+
+.pbl-difficulty-help {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  border: 1px solid #d9e3df;
+  border-radius: 8px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: #ffffff;
+  color: #4f5f5a;
+  font-size: 12px;
+}
+
+.pbl-difficulty-help strong {
+  color: #243832;
+}
+
+.pbl-difficulty-help p {
+  flex-basis: 100%;
+  margin: 0;
+  color: #6a7974;
 }
 
 .pbl-generator-error {
@@ -2643,6 +2687,11 @@ mark {
 
   .pbl-generator-form .ant-btn {
     width: 100%;
+  }
+
+  .pbl-difficulty-help {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .pbl-history-heading,
